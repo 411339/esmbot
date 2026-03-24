@@ -1,16 +1,11 @@
-import type InteractionCollector from "../pagination/awaitinteractions.ts";
 import type { MediaMeta } from "./mediadetect.ts";
 import type { ExtCommand } from "./types.ts";
 
 export const commands = new Map<string, ExtCommand>();
-export const messageCommands = new Map<string, ExtCommand>();
-export const userCommands = new Map<string, ExtCommand>();
 
 export const paths = new Map<string, string>();
 export const aliases = new Map<string, string>();
 export const categories = new Map<string, Set<string>>();
-
-export const collectors = new Map<string, InteractionCollector>();
 
 export const locales = new Map();
 

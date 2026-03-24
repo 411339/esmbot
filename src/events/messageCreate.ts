@@ -1,53 +1,25 @@
 import { Buffer } from "node:buffer";
 import process from "node:process";
-import { type AnyTextableChannel, GroupChannel, type Message, PrivateChannel, ThreadChannel } from "oceanic.js";
 import Command from "#cmd-classes/command.js";
 import MediaCommand from "#cmd-classes/mediaCommand.js";
 import { aliases, commands, disabledCache, disabledCmdCache, prefixCache } from "#utils/collections.js";
-import detectRuntime from "#utils/detectRuntime.js";
 import { getString } from "#utils/i18n.js";
 import { error as _error, log } from "#utils/logger.js";
 import { clean } from "#utils/misc.js";
 import parseCommand from "#utils/parseCommand.js";
 import { upload } from "#utils/tempimages.js";
-import type { DBGuild, EventParams } from "#utils/types.js";
-
-let Sentry: typeof import("@sentry/node");
-if (process.env.SENTRY_DSN && process.env.SENTRY_DSN !== "") {
-  Sentry = await import(`@sentry/${detectRuntime().type}`);
-}
+import type { DBGuild, EventParams, FluxerMessage } from "#utils/types.js";
 
 let mentionRegex: RegExp;
 
 /**
- * Runs when someone sends a message.
+ * Runs when a message is created on Fluxer.
  */
-export default async ({ client, database }: EventParams, message: Message) => {
-  // block if client is not ready yet
+export default async ({ client, database }: EventParams, message: FluxerMessage) => {
   if (!client.ready) return;
 
-  // ignore other bots
+  // ignore bots
   if (message.author.bot) return;
-
-  // don't run command if bot can't send messages
-  let permChannel: AnyTextableChannel | undefined;
-  if (message.channel instanceof ThreadChannel && !message.channel.parent) {
-    try {
-      permChannel = await client.rest.channels.get<AnyTextableChannel>(message.channel.parentID);
-    } catch {
-      return;
-    }
-  } else {
-    permChannel = message.channel;
-  }
-  if (
-    message.guildID &&
-    !(permChannel instanceof PrivateChannel) &&
-    !(permChannel instanceof GroupChannel) &&
-    permChannel?.guild.roles.size !== 0 &&
-    !permChannel?.permissionsOf(client.user.id).has("SEND_MESSAGES")
-  )
-    return;
 
   if (!mentionRegex) mentionRegex = new RegExp(`^<@!?${client.user.id}> `);
 
@@ -55,39 +27,38 @@ export default async ({ client, database }: EventParams, message: Message) => {
   let text: string;
   const defaultPrefix = process.env.PREFIX ?? "&";
   const mentionResult = message.content.match(mentionRegex);
+
   if (mentionResult) {
     text = message.content.substring(mentionResult[0].length).trim();
-  } else if (message.guildID && database) {
-    const cachedPrefix = prefixCache.get(message.guildID);
+  } else if (message.guild_id && database) {
+    const cachedPrefix = prefixCache.get(message.guild_id);
     if (cachedPrefix && message.content.startsWith(cachedPrefix)) {
       text = message.content.substring(cachedPrefix.length).trim();
     } else {
-      guildDB = await database.getGuild(message.guildID);
+      guildDB = await database.getGuild(message.guild_id);
       if (message.content.startsWith(guildDB.prefix)) {
         text = message.content.substring(guildDB.prefix.length).trim();
-        prefixCache.set(message.guildID, guildDB.prefix);
+        prefixCache.set(message.guild_id, guildDB.prefix);
       } else {
         return;
       }
     }
   } else if (message.content.startsWith(defaultPrefix)) {
     text = message.content.substring(defaultPrefix.length).trim();
-  } else if (!message.guildID) {
+  } else if (!message.guild_id) {
+    // DMs: accept without prefix
     text = message.content;
   } else {
     return;
   }
 
-  // separate commands and args
   const preArgs = text.split(/\s+/g);
   const shifted = preArgs.shift();
   if (!shifted) return;
   const cmdBaseName = shifted.toLowerCase();
   const aliased = aliases.get(cmdBaseName);
-
   let cmdName = aliased ?? cmdBaseName;
 
-  // check if command exists and if it's enabled
   const cmdBase = commands.get(cmdName);
   if (!cmdBase) return;
 
@@ -95,7 +66,6 @@ export default async ({ client, database }: EventParams, message: Message) => {
   let cmd = cmdBase as typeof Command;
   if (!(cmd.prototype instanceof Command)) return;
 
-  // parse args
   const parsed = parseCommand(preArgs);
   let canon = cmdName;
   if (cmdBase.baseCommand) {
@@ -113,48 +83,45 @@ export default async ({ client, database }: EventParams, message: Message) => {
 
   if (!cmd) return;
 
-  // block certain commands from running in DMs
-  if (!cmd.directAllowed && !message.guildID) return;
+  // Block DM-only commands in guilds and vice versa
+  if (!cmd.directAllowed && !message.guild_id) return;
 
   if (cmd.dbRequired && !database) {
-    await client.rest.channels.createMessage(message.channelID, {
+    await client.rest.createMessage(message.channel_id, {
       content: getString("noDatabase"),
+      message_reference: { message_id: message.id, fail_if_not_exists: false },
     });
     return;
   }
 
-  // don't run if message is in a disabled channel
-  if (message.guildID && database) {
-    let disabled = disabledCache.get(message.guildID);
+  // Disabled channels / commands
+  if (message.guild_id && database) {
+    let disabled = disabledCache.get(message.guild_id);
     if (!disabled) {
-      if (!guildDB) guildDB = await database.getGuild(message.guildID);
-      disabledCache.set(message.guildID, guildDB.disabled);
+      if (!guildDB) guildDB = await database.getGuild(message.guild_id);
+      disabledCache.set(message.guild_id, guildDB.disabled);
       disabled = guildDB.disabled;
     }
-    if (disabled.includes(message.channelID) && command !== "channel") return;
+    if (disabled.includes(message.channel_id) && command !== "channel") return;
 
-    let disabledCmds = disabledCmdCache.get(message.guildID);
+    let disabledCmds = disabledCmdCache.get(message.guild_id);
     if (!disabledCmds) {
-      if (!guildDB) guildDB = await database.getGuild(message.guildID);
-      disabledCmdCache.set(message.guildID, guildDB.disabled_commands);
+      if (!guildDB) guildDB = await database.getGuild(message.guild_id);
+      disabledCmdCache.set(message.guild_id, guildDB.disabled_commands);
       disabledCmds = guildDB.disabled_commands;
     }
     if (disabledCmds.includes(command) || disabledCmds.includes(cmdName) || disabledCmds.includes(canon)) return;
   }
 
-  // actually run the command
   log("log", `${message.author.username} (${message.author.id}) ran classic command ${command}`);
+
   const reference = {
-    messageReference: {
-      channelID: message.channelID,
-      messageID: message.id,
-      guildID: message.guildID ?? undefined,
-      failIfNotExists: false,
-    },
-    allowedMentions: {
-      repliedUser: false,
-    },
+    message_id: message.id,
+    channel_id: message.channel_id,
+    guild_id: message.guild_id,
+    fail_if_not_exists: false,
   };
+
   try {
     const startTime = new Date();
     const commandClass = new cmd(client, database, {
@@ -162,135 +129,87 @@ export default async ({ client, database }: EventParams, message: Message) => {
       cmdName: canon,
       message,
       args: parsed.args,
-      content: text.replace(command, "").trim(), // we also provide the message content as a parameter for cases where we need more accuracy
+      content: text.replace(command, "").trim(),
       specialArgs: parsed.flags,
     });
     const result = await commandClass.run();
     const endTime = new Date();
-    if (endTime.getTime() - startTime.getTime() >= 180000) reference.allowedMentions.repliedUser = true;
+    const allowRepliedUserMention = endTime.getTime() - startTime.getTime() >= 180000;
+
+    const baseAllowedMentions = {
+      parse: ["users"],
+      replied_user: allowRepliedUserMention,
+    };
+
     if (typeof result === "string") {
-      reference.allowedMentions.repliedUser = true;
-      await client.rest.channels.createMessage(
-        message.channelID,
-        Object.assign(
-          {
-            content: result,
-          },
-          reference,
-        ),
-      );
-    } else if (typeof result === "object") {
-      if (commandClass instanceof MediaCommand && result.files) {
+      await client.rest.createMessage(message.channel_id, {
+        content: result,
+        message_reference: reference,
+        allowed_mentions: baseAllowedMentions,
+      });
+    } else if (typeof result === "object" && result !== null) {
+      if (commandClass instanceof MediaCommand && "files" in result && result.files) {
+        // File size limits per guild boost tier
         let fileSize = 10485760;
-        if (message.guild) {
-          switch (message.guild.premiumTier) {
-            case 2:
-              fileSize = 52428800;
-              break;
-            case 3:
-              fileSize = 104857600;
-              break;
-          }
+        const guild = message.guild_id ? client.guilds.get(message.guild_id) : undefined;
+        if (guild?.premium_tier) {
+          if (guild.premium_tier >= 3) fileSize = 104857600;
+          else if (guild.premium_tier >= 2) fileSize = 52428800;
         }
-        const file = result.files[0];
-        if (file.contents.length > fileSize) {
-          if (process.env.TEMPDIR && process.env.TEMPDIR !== "" && commandClass.permissions.has("EMBED_LINKS")) {
-            await upload(client, { ...file, flags: result.flags }, message);
+
+        const file = result.files[0] as { name: string; data: Buffer };
+        if (file.data.length > fileSize) {
+          if (process.env.TEMPDIR && process.env.TEMPDIR !== "") {
+            await upload(client, { ...file, flags: undefined }, message);
           } else {
-            await client.rest.channels.createMessage(message.channelID, {
+            await client.rest.createMessage(message.channel_id, {
               content: getString("image.noTempServer"),
+              message_reference: reference,
+              allowed_mentions: baseAllowedMentions,
             });
           }
         } else {
-          await client.rest.channels.createMessage(
-            message.channelID,
-            Object.assign(
-              {
-                files: [file],
-              },
-              reference,
-            ),
-          );
+          await client.rest.createMessage(message.channel_id, {
+            files: [file],
+            message_reference: reference,
+            allowed_mentions: baseAllowedMentions,
+          });
         }
       } else {
-        await client.rest.channels.createMessage(message.channelID, Object.assign(result, reference));
+        await client.rest.createMessage(message.channel_id, {
+          ...(result as object),
+          message_reference: reference,
+          allowed_mentions: baseAllowedMentions,
+        });
       }
     }
   } catch (e) {
-    const error = e as Error;
-    if (process.env.SENTRY_DSN && process.env.SENTRY_DSN !== "")
-      Sentry.captureException(error, {
-        tags: {
-          process: process.env.pm_id ? Number.parseInt(process.env.pm_id) - 1 : 0,
-          command,
-          args: JSON.stringify(preArgs),
-        },
+    const err = e as Error;
+    if (err.toString().includes("Request entity too large")) {
+      await client.rest.createMessage(message.channel_id, {
+        content: getString("image.tooLarge"),
+        message_reference: reference,
       });
-    if (error.toString().includes("Request entity too large")) {
-      await client.rest.channels.createMessage(
-        message.channelID,
-        Object.assign(
-          {
-            content: getString("image.tooLarge"),
-          },
-          reference,
-        ),
-      );
-    } else if (error.toString().includes("Job ended prematurely")) {
-      await client.rest.channels.createMessage(
-        message.channelID,
-        Object.assign(
-          {
-            content: getString("image.jobEnded"),
-          },
-          reference,
-        ),
-      );
-    } else if (error.toString().includes("Timed out")) {
-      await client.rest.channels.createMessage(
-        message.channelID,
-        Object.assign(
-          {
-            content: getString("image.timeoutDownload"),
-          },
-          reference,
-        ),
-      );
+    } else if (err.toString().includes("Job ended prematurely")) {
+      await client.rest.createMessage(message.channel_id, {
+        content: getString("image.jobEnded"),
+        message_reference: reference,
+      });
+    } else if (err.toString().includes("Timed out")) {
+      await client.rest.createMessage(message.channel_id, {
+        content: getString("image.timeoutDownload"),
+        message_reference: reference,
+      });
     } else {
-      _error(`Error occurred with command message ${message.content}: ${(error as Error).stack || error}`);
+      _error(`Error occurred with command message ${message.content}: ${err.stack || err}`);
       try {
-        await client.rest.channels.createMessage(
-          message.channelID,
-          Object.assign(
-            {
-              content: `${getString("error")} <https://github.com/esmBot/esmBot/issues>`,
-              files: [
-                {
-                  contents: Buffer.from(clean(error)),
-                  name: "error.txt",
-                },
-              ],
-              components: [
-                {
-                  type: 1,
-                  components: [
-                    {
-                      type: 2,
-                      label: getString("support"),
-                      style: 5,
-                      url: "https://discord.gg/esmbot-support-592399417676529688",
-                    },
-                  ],
-                },
-              ],
-            },
-            reference,
-          ),
-        );
-      } catch (err) {
-        _error(
-          `While attempting to send the previous error message, another error occurred: ${(err as Error).stack || err}`,
-        );
+        await client.rest.createMessage(message.channel_id, {
+          content: `${getString("error")} <https://github.com/esmBot/esmBot/issues>`,
+          files: [{ name: "error.txt", data: Buffer.from(clean(err)) }],
+          message_reference: reference,
+        });
+      } catch (err2) {
+        _error(`While sending error message, another error occurred: ${(err2 as Error).stack || err2}`);
       }
     }
   } finally {

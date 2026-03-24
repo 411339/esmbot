@@ -1,17 +1,13 @@
 import { execFile as baseExecFile } from "node:child_process";
 import process from "node:process";
 import util, { promisify } from "node:util";
-import { type DotenvParseOutput, config } from "dotenv";
-import type { AnyChannel, AnyPrivateChannel, Client, CommandInteraction, Message } from "oceanic.js";
-import commandsConfig from "#config/commands.json" with { type: "json" };
+import { config, type DotenvParseOutput } from "dotenv";
 import messagesConfig from "#config/messages.json" with { type: "json" };
+import commandsConfig from "#config/commands.json" with { type: "json" };
 import packageJson from "../../package.json" with { type: "json" };
 import type { DatabasePlugin } from "../database.ts";
+import type { FluxerClient, FluxerMessage } from "./types.ts";
 import { disconnect, servers } from "./media.ts";
-
-const pm2 = process.env.CLUSTER_TYPE === "pm2" ? (await import("pm2")).default : null;
-
-let broadcast = false;
 
 export async function getVers() {
   process.env.ESMBOT_VER = packageJson.version;
@@ -45,12 +41,11 @@ k  <BBBw BBBBEBBBBBBBBBBBBBBBBBQ4BM  #
       *+,   " F'"'*^~~~^"^\`  V+*^
           \`"""
 
-esmBot ${process.env.ESMBOT_VER} (${process.env.GIT_REV})
+esmBot ${process.env.ESMBOT_VER} (${process.env.GIT_REV}) — Fluxer edition
 `);
 }
 
-// random(array) to select a random entry in array
-export function random<T>(array: T[]) {
+export function random<T>(array: T[]): T {
   return array[Math.floor(Math.random() * array.length)];
 }
 
@@ -58,8 +53,7 @@ const optionalReplace = (token: string) => {
   return token === undefined || token === "" ? "" : token === "true" || token === "false" ? token : "<redacted>";
 };
 
-// clean(text) to clean message of any private info or mentions
-export function clean(input: string | Error, remove: string[] = [], skipEnv = false) {
+export function clean(input: string | Error, remove: string[] = [], skipEnv = false): string {
   let text = input;
   if (typeof text !== "string") text = util.inspect(text, { depth: 1 });
 
@@ -88,8 +82,7 @@ export function clean(input: string | Error, remove: string[] = [], skipEnv = fa
   return text;
 }
 
-// textEncode(string) to encode characters for image processing
-export function textEncode(string: string) {
+export function textEncode(string: string): string {
   return string
     .replaceAll("&", "&amp;")
     .replaceAll(">", "&gt;")
@@ -101,122 +94,49 @@ export function textEncode(string: string) {
     .replaceAll("\\,", ",");
 }
 
-// set activity (a.k.a. the gamer code)
-export async function activityChanger(bot: Client) {
+let broadcast = false;
+
+export async function activityChanger(client: FluxerClient) {
   if (!broadcast) {
-    await bot.editStatus("dnd", [
+    await client.editStatus("dnd", [
       {
         type: 0,
-        name: random(messagesConfig.messages) + (commandsConfig.types.classic ? ` | @${bot.user.username} help` : ""),
+        name: random(messagesConfig.messages),
       },
     ]);
   }
-  setTimeout(() => activityChanger(bot), 900000);
+  setTimeout(() => activityChanger(client), 900000);
 }
 
-export async function checkBroadcast(bot: Client, db: DatabasePlugin | undefined) {
-  if (!db) {
-    return;
-  }
+export async function checkBroadcast(client: FluxerClient, db: DatabasePlugin | undefined) {
+  if (!db) return;
   const message = await db.getBroadcast();
-  if (message) {
-    startBroadcast(bot, message);
-  }
+  if (message) startBroadcast(client, message);
 }
 
-export function startBroadcast(bot: Client, message: string) {
-  bot.editStatus("dnd", [
-    {
-      type: 0,
-      name: message + (commandsConfig.types.classic ? ` | @${bot.user.username} help` : ""),
-    },
-  ]);
+export function startBroadcast(client: FluxerClient, message: string) {
+  client.editStatus("dnd", [{ type: 0, name: message }]);
   broadcast = true;
 }
 
-export function endBroadcast(bot: Client) {
-  bot.editStatus("dnd", [
-    {
-      type: 0,
-      name: random(messagesConfig.messages) + (commandsConfig.types.classic ? ` | @${bot.user.username} help` : ""),
-    },
-  ]);
+export function endBroadcast(client: FluxerClient) {
+  client.editStatus("dnd", [{ type: 0, name: random(messagesConfig.messages) }]);
   broadcast = false;
 }
 
-export async function exit(client: Client, database: DatabasePlugin | undefined) {
+export async function exit(client: FluxerClient, database: DatabasePlugin | undefined) {
   client.disconnect(false);
   if (database) await database.stop();
   disconnect();
   process.exit();
 }
 
-export function getServers(bot: Client): Promise<number> {
-  return new Promise((resolve, reject) => {
-    if (pm2) {
-      pm2.launchBus((_err, pm2Bus) => {
-        const listener = (packet: { data: { type: string; serverCount: number } }) => {
-          if (packet.data?.type === "countResponse") {
-            resolve(packet.data.serverCount);
-            pm2Bus.off("process:msg");
-          }
-        };
-        pm2Bus.on("process:msg", listener);
-
-        pm2.list((err, list) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-          const managerProc = list.find((v) => v.name === "esmBot-manager");
-          if (!managerProc) {
-            pm2Bus.off("process:msg");
-            return resolve(bot.guilds.size);
-          }
-          pm2.sendDataToProcessId(
-            managerProc.pm_id as number,
-            {
-              id: managerProc.pm_id,
-              type: "process:msg",
-              data: {
-                type: "getCount",
-              },
-              topic: true,
-            },
-            (err) => {
-              if (err) reject(err);
-            },
-          );
-        });
-      });
-    } else if (process.env.CLUSTER_TYPE === "node") {
-      const listener = (packet: { data: { type: string; serverCount: number } }) => {
-        if (packet.data?.type === "countResponse") {
-          clearTimeout(timeout);
-          resolve(packet.data.serverCount);
-          process.off("message", listener);
-        }
-      };
-      process.on("message", listener);
-
-      const timeout = setTimeout(() => {
-        process.off("message", listener);
-        reject(Error("Timed out while getting server count"));
-      }, 3000);
-
-      process.send?.({
-        data: {
-          type: "getCount",
-        },
-      });
-    } else {
-      resolve(bot.guilds.size);
-    }
-  });
+export function getServers(client: FluxerClient): number {
+  return client.guilds.size;
 }
 
-// copied from eris
-export function cleanMessage(message: Message, content: string) {
+/** Clean a message's text content (remove mention noise, encode for image processing) */
+export function cleanMessage(message: FluxerMessage, content: string): string {
   let cleanContent = content?.replace(/<a?(:\w+:)[0-9]+>/g, "$1") || "";
 
   const author = message.author;
@@ -227,73 +147,29 @@ export function cleanMessage(message: Message, content: string) {
   cleanContent = cleanContent.replace(new RegExp(`<@!?${author.id}>`, "g"), `@${authorName}`);
 
   if (message.mentions) {
-    for (const mention of message.mentions.members) {
-      if (mention.nick) {
-        cleanContent = cleanContent.replace(new RegExp(`<@!?${mention.id}>`, "g"), `@${mention.nick}`);
-      }
+    for (const mention of message.mentions) {
       cleanContent = cleanContent.replace(new RegExp(`<@!?${mention.id}>`, "g"), `@${mention.username}`);
     }
+  }
 
-    if (message.guildID && message.mentions.roles) {
-      for (const roleID of message.mentions.roles) {
-        const role = message.guild?.roles.get(roleID);
-        const roleName = role ? role.name : "deleted-role";
-        cleanContent = cleanContent.replace(new RegExp(`<@&${roleID}>`, "g"), `@${roleName}`);
-      }
-    }
-
-    for (const id of message.mentions.channels) {
-      const channel = message.client.getChannel<Exclude<AnyChannel, AnyPrivateChannel>>(id);
-      if (channel?.name && channel.mention) {
-        cleanContent = cleanContent.replace(channel.mention, `#${channel.name}`);
-      }
+  if (message.mention_roles) {
+    // We don't have role name resolution here — just strip the mention tags
+    for (const roleId of message.mention_roles) {
+      cleanContent = cleanContent.replace(new RegExp(`<@&${roleId}>`, "g"), `@role`);
     }
   }
 
   return textEncode(cleanContent);
 }
 
-export function cleanInteraction(interaction: CommandInteraction, content: string) {
-  let cleanContent = content?.replace(/<a?(:\w+:)[0-9]+>/g, "$1") || "";
-
-  const author = interaction.user;
-  let authorName = author.username;
-  if (interaction.member?.nick) {
-    authorName = interaction.member.nick;
-  }
-  cleanContent = cleanContent.replace(new RegExp(`<@!?${author.id}>`, "g"), `@${authorName}`);
-
-  for (const mention of interaction.data.resolved.members.values()) {
-    if (mention.nick) {
-      cleanContent = cleanContent.replace(new RegExp(`<@!?${mention.id}>`, "g"), `@${mention.nick}`);
-    }
-    cleanContent = cleanContent.replace(new RegExp(`<@!?${mention.id}>`, "g"), `@${mention.username}`);
-  }
-
-  if (interaction.guildID && interaction.data.resolved.roles.size > 0) {
-    for (const role of interaction.data.resolved.roles.values()) {
-      const roleName = role ? role.name : "deleted-role";
-      cleanContent = cleanContent.replace(new RegExp(`<@&${role.id}>`, "g"), `@${roleName}`);
-    }
-  }
-
-  for (const channel of interaction.data.resolved.channels.values()) {
-    if (channel.name && channel.mention) {
-      cleanContent = cleanContent.replace(channel.mention, `#${channel.name}`);
-    }
-  }
-
-  return textEncode(cleanContent);
-}
-
-export function isEmpty(string: string) {
+export function isEmpty(string: string): boolean {
   return string.length === 0 || string.replace(/[\s\u2800\p{C}]/gu, "").length === 0;
 }
 
-export function safeBigInt(input: string | number | bigint | boolean) {
+export function safeBigInt(input: string | number | bigint | boolean): bigint {
   try {
     return BigInt(input);
   } catch {
-    return -1;
+    return -1n;
   }
 }

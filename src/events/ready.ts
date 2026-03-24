@@ -1,26 +1,15 @@
 import process from "node:process";
-import commandsConfig from "#config/commands.json" with { type: "json" };
-import { send } from "#utils/handler.js";
 import { createPage, generateList } from "#utils/help.js";
 import logger from "#utils/logger.js";
 import { activityChanger, checkBroadcast } from "#utils/misc.js";
-import type { EventParams } from "#utils/types.js";
+import type { EventParams, FluxerReadyData } from "#utils/types.js";
+
 let ready = false;
 
-export default async ({ client, database }: EventParams) => {
+export default async ({ client, database }: EventParams, data: FluxerReadyData) => {
   if (ready) return;
 
-  // send slash command data
-  if (commandsConfig.types.application && !(process.env.CLUSTER_TYPE && process.env.pm_id !== "1")) {
-    try {
-      await send(client);
-    } catch (e) {
-      logger.log("error", e as string);
-      logger.log("error", "Failed to send command data to Discord, slash/message commands may be unavailable.");
-    }
-  }
-
-  // generate docs
+  // Generate help docs if OUTPUT is set
   if (process.env.OUTPUT && process.env.OUTPUT !== "") {
     generateList();
     await createPage(process.env.OUTPUT);
@@ -32,15 +21,5 @@ export default async ({ client, database }: EventParams) => {
 
   ready = true;
 
-  if (process.env.CLUSTER_TYPE === "pm2") {
-    process.send?.("ready");
-  } else if (process.env.CLUSTER_TYPE === "node") {
-    process.send?.({
-      data: {
-        type: "ready",
-      },
-    });
-  }
-
-  if (process.env.CLUSTER_TYPE !== "node") logger.log("info", "Started esmBot.");
+  logger.log("info", `Started esmBot on Fluxer as @${data.user.username}#${data.user.discriminator}.`);
 };

@@ -1,21 +1,9 @@
-import {
-  type AnyTextableChannel,
-  type Attachment,
-  CommandInteraction,
-  Constants,
-  type JSONAttachment,
-  type Message,
-  type RawAttachment,
-  type User,
-} from "oceanic.js";
 import messages from "#config/messages.json" with { type: "json" };
 import { runningCommands, selectedImages } from "#utils/collections.js";
-import { convFlagType } from "#utils/handler.js";
-import { getAllLocalizations } from "#utils/i18n.js";
 import { runMediaJob } from "#utils/media.js";
 import mediaDetect, { type MediaMeta } from "#utils/mediadetect.js";
 import { clean, isEmpty, random } from "#utils/misc.js";
-import type { ExtendedConstructedCommandOptions, MediaParams } from "#utils/types.js";
+import type { CreateMessageData, ExtendedConstructedCommandOptions, MediaParams } from "#utils/types.js";
 import Command from "./command.ts";
 
 class MediaCommand extends Command {
@@ -25,28 +13,24 @@ class MediaCommand extends Command {
     return {};
   }
 
-  async criteria(_text?: string | number | boolean | User | Attachment, _url?: string) {
+  async criteria(_text?: string | number | boolean): Promise<boolean> {
     return true;
   }
 
-  async run() {
+  async run(): Promise<string | CreateMessageData | undefined> {
     this.success = false;
 
-    if (!this.permissions.has("ATTACH_FILES")) return this.getString("permissions.noAttachFiles");
+    if (!this.hasPermission("ATTACH_FILES")) return this.getString("permissions.noAttachFiles");
 
-    const timestamp =
-      this.type === "application" && this.interaction
-        ? CommandInteraction.getCreatedAt(this.interaction.id)
-        : (this.message?.createdAt ?? new Date());
-    // check if this command has already been run in this channel with the same arguments, and we are awaiting its result
-    // if so, don't re-run it
+    const timestamp = this.message.timestamp ? new Date(this.message.timestamp) : new Date();
+
+    // Debounce: don't re-run the same command within 5 s for this user
     if (
       runningCommands.has(this.author?.id) &&
-      runningCommands.get(this.author?.id).getTime() - timestamp.getTime() < 5000
+      runningCommands.get(this.author?.id)!.getTime() - timestamp.getTime() < 5000
     ) {
       return this.getString("image.slowDown");
     }
-    // before awaiting the command result, add this command to the set of running commands
     runningCommands.set(this.author.id, timestamp);
 
     const staticProps = this.constructor as typeof MediaCommand;
@@ -67,9 +51,9 @@ class MediaCommand extends Command {
             this.permissions,
             staticProps.supportedTypes,
             this.message,
-            this.interaction,
+            undefined,
             true,
-          ).catch((e) => {
+          ).catch((e: Error) => {
             if (e.name === "AbortError") {
               runningCommands.delete(this.author.id);
               return this.getString("image.timeout");
@@ -78,7 +62,7 @@ class MediaCommand extends Command {
           }));
         if (image === undefined) {
           runningCommands.delete(this.author.id);
-          return `${this.getString(`commands.noImage.${this.cmdName}`, { returnNull: true }) || this.getString("image.noImage", { returnNull: true }) || staticProps.noImage} ${this.getString("image.tip", { params: { name: this.client.user.globalName ?? this.client.user.username } })}`;
+          return `${staticProps.noImage} ${this.getString("image.tip", { params: { name: this.client.user.global_name ?? this.client.user.username } })}`;
         }
         if (typeof image === "string") return image;
         selectedImages.delete(this.author.id);
@@ -102,15 +86,11 @@ class MediaCommand extends Command {
         mediaParams = {
           cmd: staticProps.command,
           type: image.mediaType ?? "image",
-          params: {
-            togif: !!this.getOptionBoolean("togif"),
-          },
-          input: {
-            type: image.type,
-          },
-          id: (this.interaction ?? this.message)?.id ?? Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(),
+          params: {},
+          input: { type: image.type },
+          id: this.message.id,
           path: image.path,
-          url: image.url, // technically not required but can be useful for text filtering
+          url: image.url,
           name: image.name,
           onlyAnim: !!staticProps.requiresAnim,
         };
@@ -122,31 +102,19 @@ class MediaCommand extends Command {
       mediaParams = {
         cmd: staticProps.command,
         type: "image",
-        params: {
-          togif: !!this.getOptionBoolean("togif"),
-        },
-        id: (this.interaction ?? this.message)?.id ?? Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(),
+        params: {},
+        id: this.message.id,
       };
     }
 
-    const spoiler = this.getOptionBoolean("spoiler");
-    if (spoiler != null) needsSpoiler = spoiler;
+    const spoilerFlag = this.getOptionBoolean("spoiler");
+    if (spoilerFlag != null) needsSpoiler = spoilerFlag;
 
     if (staticProps.requiresParam) {
-      const text =
-        this.getOption(
-          staticProps.requiredParam,
-          convFlagType(staticProps.requiredParamType),
-          staticProps.requiredParamType !== Constants.ApplicationCommandOptionTypes.STRING &&
-            staticProps.requiredParamType !== "string",
-        ) ?? this.args.join(" ").trim();
-      if (!text || (typeof text === "string" && isEmpty(text)) || !(await this.criteria(text, mediaParams.url))) {
+      const text = this.getOptionString(staticProps.requiredParam, true) ?? this.args.join(" ").trim();
+      if (!text || (typeof text === "string" && isEmpty(text)) || !(await this.criteria(text))) {
         runningCommands.delete(this.author?.id);
-        return (
-          this.getString(`commands.noParam.${this.cmdName}`, { returnNull: true }) ||
-          this.getString("image.noParam", { returnNull: true }) ||
-          staticProps.noParam
-        );
+        return staticProps.noParam;
       }
     }
 
@@ -156,44 +124,27 @@ class MediaCommand extends Command {
       Object.assign(mediaParams.params, this.paramsFunc(mediaParams.url, mediaParams.name));
     }
 
-    let status: Message | undefined;
+    // Show a processing message for animated inputs
+    let status: FluxerMessageRef | undefined;
     if (
       mediaParams.input &&
-      (mediaParams.input.type === "image/gif" || mediaParams.input.type === "image/webp") &&
-      this.message
+      (mediaParams.input.type === "image/gif" || mediaParams.input.type === "image/webp")
     ) {
-      status = await this.processMessage(
-        this.message.channel ?? (await this.client.rest.channels.get(this.message.channelID)),
-      );
-    }
-
-    const ephemeral = this.getOptionBoolean("ephemeral");
-
-    if (this.interaction) {
-      mediaParams.ephemeral = ephemeral;
-      mediaParams.spoiler = needsSpoiler;
-      mediaParams.token = this.interaction.token;
+      try {
+        const sent = await this.client.rest.createMessage(this.message.channel_id, {
+          content: `${random(messages.emotes) || "⚙️"} ${this.getString("image.processing")}`,
+        });
+        status = { channel_id: sent.channel_id, id: sent.id };
+      } catch {
+        // ignore; status message is optional
+      }
     }
 
     try {
       const result = await runMediaJob(mediaParams);
       const buffer = result.buffer;
       const type = result.type;
-      if (type === "sent") {
-        if (buffer.length > 2 && this.interaction && this.interaction.authorizingIntegrationOwners[0] === undefined) {
-          const attachment = JSON.parse(buffer.toString()) as RawAttachment & JSONAttachment;
-          const path = new URL(attachment.proxy_url ?? attachment.proxyURL);
-          path.searchParams.set("animated", "true");
-          selectedImages.set(this.interaction.user.id, {
-            url: attachment.url,
-            path: path.toString(),
-            name: attachment.filename,
-            type: attachment.content_type ?? attachment.contentType,
-            spoiler: attachment.filename.startsWith("SPOILER_"),
-          });
-        }
-        return;
-      }
+
       if (type === "frames") return this.getString("image.frames");
       if (type === "unknown") return this.getString("image.unknown");
       if (type === "noresult") return this.getString("image.noResult");
@@ -201,20 +152,20 @@ class MediaCommand extends Command {
       if (type === "nocmd") return this.getString("image.nocmd");
       if (type === "noanim" && staticProps.requiresAnim) return this.getString("image.noanim");
       if (type === "empty") return staticProps.empty;
+
       this.success = true;
-      if (type === "text")
-        return {
-          content: `\`\`\`\n${clean(buffer.toString("utf8"), [], true)}\n\`\`\``,
-          flags: ephemeral ? 64 : undefined,
-        };
+
+      if (type === "text") {
+        return { content: `\`\`\`\n${clean(buffer.toString("utf8"), [], true)}\n\`\`\`` };
+      }
+
       return {
         files: [
           {
-            contents: buffer,
             name: `${needsSpoiler ? "SPOILER_" : ""}${staticProps.command}.${type}`,
+            data: buffer,
           },
         ],
-        flags: ephemeral ? 64 : undefined,
       };
     } catch (e) {
       const err = e as Error;
@@ -226,28 +177,22 @@ class MediaCommand extends Command {
       if (err.toString().includes("No available servers")) return this.getString("image.noServers");
       throw err;
     } finally {
-      try {
-        if (status) await status.delete();
-      } catch {
-        // no-op
+      if (status) {
+        try {
+          await this.client.rest.deleteMessage(status.channel_id, status.id);
+        } catch {
+          // ignore
+        }
       }
       runningCommands.delete(this.author?.id);
     }
   }
 
-  processMessage(channel: AnyTextableChannel): Promise<Message> {
-    return channel.createMessage({
-      content: `${random(messages.emotes) || "⚙️"} ${this.getString("image.processing")}`,
-    });
-  }
-
   static addTextParam() {
     this.flags.unshift({
       name: "text",
-      nameLocalizations: getAllLocalizations("image.flagNames.text"),
-      type: Constants.ApplicationCommandOptionTypes.STRING,
+      type: "string",
       description: "The text to put on the image",
-      descriptionLocalizations: getAllLocalizations("image.flags.text"),
       maxLength: 4096,
       required: !this.textOptional,
       classic: true,
@@ -258,48 +203,9 @@ class MediaCommand extends Command {
     this.flags = [];
     if (this.requiresImage) {
       this.flags.push(
-        {
-          name: "image",
-          nameLocalizations: getAllLocalizations("image.flagNames.image"),
-          type: Constants.ApplicationCommandOptionTypes.ATTACHMENT,
-          description: "An image/GIF attachment",
-          descriptionLocalizations: getAllLocalizations("image.flags.image"),
-        },
-        {
-          name: "link",
-          nameLocalizations: getAllLocalizations("image.flagNames.link"),
-          type: Constants.ApplicationCommandOptionTypes.STRING,
-          description: "An image/GIF URL",
-          descriptionLocalizations: getAllLocalizations("image.flags.link"),
-        },
+        { name: "link", type: "string", description: "An image/GIF URL", classic: true },
       );
     }
-    if (!this.alwaysGIF) {
-      this.flags.push({
-        name: "togif",
-        nameLocalizations: getAllLocalizations("image.flagNames.togif"),
-        type: Constants.ApplicationCommandOptionTypes.BOOLEAN,
-        description: "Force GIF output",
-        descriptionLocalizations: getAllLocalizations("image.flags.togif"),
-      });
-    }
-
-    this.flags.push(
-      {
-        name: "spoiler",
-        nameLocalizations: getAllLocalizations("image.flagNames.spoiler"),
-        type: Constants.ApplicationCommandOptionTypes.BOOLEAN,
-        description: "Attempt to send output as a spoiler",
-        descriptionLocalizations: getAllLocalizations("image.flags.spoiler"),
-      },
-      {
-        name: "ephemeral",
-        nameLocalizations: getAllLocalizations("image.flagNames.ephemeral"),
-        type: Constants.ApplicationCommandOptionTypes.BOOLEAN,
-        description: "Attempt to send output as an ephemeral/temporary response",
-        descriptionLocalizations: getAllLocalizations("image.flags.ephemeral"),
-      },
-    );
     return this;
   }
 
@@ -329,5 +235,7 @@ class MediaCommand extends Command {
   static empty = "The resulting output was empty!";
   static command = "";
 }
+
+type FluxerMessageRef = { channel_id: string; id: string };
 
 export default MediaCommand;

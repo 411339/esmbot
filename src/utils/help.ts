@@ -2,41 +2,39 @@ import { promises } from "node:fs";
 import process from "node:process";
 import commandConfig from "#config/commands.json" with { type: "json" };
 import { commands } from "./collections.ts";
-import type { Param } from "./types.ts";
+import type { CommandsConfig, Param } from "./types.ts";
 
 export const categoryTemplate = {
-  general: [],
-  tags: ["> **Every command in this category is a subcommand of the tag command.**\n"],
-  "image-editing": ["> **These commands support the PNG, JPEG, WEBP, AVIF (static only), and GIF formats.**\n"],
+  general: [] as string[],
+  tags: ["> **Every command in this category is a subcommand of the tag command.**\n"] as string[],
+  "image-editing": ["> **These commands support the PNG, JPEG, WEBP, AVIF (static only), and GIF formats.**\n"] as string[],
 };
-export let categories: {
-  [key: string]: string[];
-} = categoryTemplate;
+export let categories: { [key: string]: string[] } = { ...categoryTemplate };
 
 export let generated = false;
 
 function generateEntries(baseName: string, params: Param[], desc: string, category: string) {
   let entry = `**${baseName}**`;
   const sorted = [];
-  let generated = false;
+  let generatedSub = false;
   for (const param of params) {
     if (typeof param !== "string") {
       generateEntries(`${baseName} ${param.name}`, param.params ?? [], param.desc, category);
-      generated = true;
+      generatedSub = true;
     } else {
       sorted.push(param);
     }
   }
-  if (generated) return;
+  if (generatedSub) return;
   entry += `${sorted.length > 0 ? ` ${sorted.join(" ")}` : ""} - ${desc}`;
+  if (!categories[category]) categories[category] = [];
   categories[category].push(entry);
 }
 
 export function generateList() {
-  categories = categoryTemplate;
+  categories = { ...categoryTemplate };
   for (const [command, cmd] of commands) {
     if (!cmd) throw Error(`Command info missing for ${command}`);
-    if (!cmd.slashAllowed && !commandConfig.types.classic) continue;
     if (cmd.baseCommand) continue;
     if (!categories[cmd.category]) categories[cmd.category] = [];
     if (command !== "music") generateEntries(command, cmd.params, cmd.description, cmd.category);
@@ -45,7 +43,7 @@ export function generateList() {
 }
 
 export async function createPage(output: string) {
-  let template = `# <img src="https://esmbot.net/pictures/esmbot.png" width="64"> esmBot${process.env.NODE_ENV === "development" ? " Dev" : ""} Command List
+  let template = `# <img src="https://esmbot.net/pictures/esmbot.png" width="64"> esmBot${process.env.NODE_ENV === "development" ? " Dev" : ""} Command List (Fluxer edition)
 
 This page was last generated on \`${new Date().toString()}\`.
 
@@ -56,22 +54,13 @@ This page was last generated on \`${new Date().toString()}\`.
 
   template += "\n## Table of Contents\n";
   for (const category of Object.keys(categories)) {
-    const categoryStringArray = category.split("-");
-    for (const index of categoryStringArray.keys()) {
-      categoryStringArray[index] =
-        categoryStringArray[index].charAt(0).toUpperCase() + categoryStringArray[index].slice(1);
-    }
-    template += `+ [**${categoryStringArray.join(" ")}**](#${category})\n`;
+    const display = category.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    template += `+ [**${display}**](#${category})\n`;
   }
 
-  // hell
   for (const category of Object.keys(categories)) {
-    const categoryStringArray = category.split("-");
-    for (const index of categoryStringArray.keys()) {
-      categoryStringArray[index] =
-        categoryStringArray[index].charAt(0).toUpperCase() + categoryStringArray[index].slice(1);
-    }
-    template += `\n## ${categoryStringArray.join(" ")}\n`;
+    const display = category.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    template += `\n## ${display}\n`;
     for (const command of categories[category]) {
       if (command.startsWith(">")) {
         template += `${command}\n`;

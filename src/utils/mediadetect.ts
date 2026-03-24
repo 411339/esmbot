@@ -1,25 +1,18 @@
 import process from "node:process";
-import {
-  type Client,
-  type CommandInteraction,
-  Constants,
-  type Message,
-  type MessageComponent,
-  type MessageSnapshotMessage,
-  type Permission,
-  PrivateChannel,
-  type StickerItem,
-  TextableChannel,
-  ThreadChannel,
-} from "oceanic.js";
 import logger from "./logger.ts";
 import { formats, getType } from "./media.ts";
-import type { MediaParams, MediaTypeData } from "./types.ts";
+import type {
+  FluxerAttachment,
+  FluxerClient,
+  FluxerEmbed,
+  FluxerMessage,
+  MediaParams,
+  MediaTypeData,
+} from "./types.ts";
 
 const tenorURLs = ["tenor.com", "www.tenor.com"];
 const giphyURLs = ["giphy.com", "www.giphy.com", "i.giphy.com"];
 const giphyMediaURLs = [
-  // there could be more of these
   "media.giphy.com",
   "media0.giphy.com",
   "media1.giphy.com",
@@ -28,68 +21,19 @@ const giphyMediaURLs = [
   "media4.giphy.com",
 ];
 const klipyURLs = ["klipy.com"];
-
 const combined = [...tenorURLs, ...giphyURLs, ...giphyMediaURLs, ...klipyURLs];
-
 const providerUrls = ["https://tenor.co", "https://tenor.com", "https://giphy.com", "https://klipy.com"];
 
-type TenorMediaObject = {
-  url: string;
-  dims: number[];
-  duration: number;
-  size: number;
-};
-
+type TenorMediaObject = { url: string; dims: number[]; duration: number; size: number };
 type TenorResponse = {
-  error?: {
-    code: number;
-    message: string;
-    status: string;
-  };
-  results: {
-    media_formats: { [key: string]: TenorMediaObject };
-  }[];
+  error?: { code: number; message: string; status: string };
+  results: { media_formats: { [key: string]: TenorMediaObject } }[];
 };
 
-type KlipyMediaObject = {
-  url: string;
-  width: number;
-  height: number;
-  size: number;
-};
-
-type KlipyMediaTypes = {
-  gif: KlipyMediaObject;
-  webp: KlipyMediaObject;
-  jpg: KlipyMediaObject;
-  mp4: KlipyMediaObject;
-  webm: KlipyMediaObject;
-};
-
-type KlipyMediaResult = {
-  id: number;
-  slug: string;
-  title: string;
-  file: {
-    hd: KlipyMediaTypes;
-    md: KlipyMediaTypes;
-    sm: KlipyMediaTypes;
-    xs: KlipyMediaTypes;
-  };
-  tags: string[];
-  type: string;
-  blur_preview: string;
-};
-
-type KlipyResponse = {
-  result: boolean;
-  errors?: {
-    message: string[];
-  };
-  data: {
-    data: KlipyMediaResult[];
-  };
-};
+type KlipyMediaObject = { url: string; width: number; height: number; size: number };
+type KlipyMediaTypes = { gif: KlipyMediaObject; webp: KlipyMediaObject; jpg: KlipyMediaObject; mp4: KlipyMediaObject; webm: KlipyMediaObject };
+type KlipyMediaResult = { id: number; slug: string; title: string; file: { hd: KlipyMediaTypes; md: KlipyMediaTypes; sm: KlipyMediaTypes; xs: KlipyMediaTypes }; tags: string[]; type: string; blur_preview: string };
+type KlipyResponse = { result: boolean; errors?: { message: string[] }; data: { data: KlipyMediaResult[] } };
 
 export type MediaMeta = {
   path: string;
@@ -100,9 +44,6 @@ export type MediaMeta = {
   mediaType?: MediaParams["type"];
 };
 
-/**
- * Gets proper media paths.
- */
 async function getMedia(
   media: string,
   media2: string,
@@ -111,7 +52,6 @@ async function getMedia(
   spoiler = false,
   extraReturnTypes = false,
   type: string | null = null,
-  client: Client | undefined = undefined,
 ): Promise<MediaMeta | undefined> {
   let mediaURL: URL;
   try {
@@ -119,29 +59,17 @@ async function getMedia(
     if (!mediaURL.host) throw null;
     if (mediaURL.protocol !== "http:" && mediaURL.protocol !== "https:") throw null;
   } catch {
-    return {
-      url: media2,
-      path: media,
-      name: "null",
-      type: "badurl",
-      spoiler,
-    };
+    return { url: media2, path: media, name: "null", type: "badurl", spoiler };
   }
   const fileNameSplit = mediaURL.pathname.split("/");
   const fileName = fileNameSplit[fileNameSplit.length - 1];
   const fileNameNoExtension = fileName.slice(0, fileName.lastIndexOf("."));
-  const payload: MediaMeta = {
-    url: media2,
-    path: media,
-    name: fileNameNoExtension,
-    spoiler,
-  };
+  const payload: MediaMeta = { url: media2, path: media, name: fileNameNoExtension, spoiler };
   const url2 = new URL(media2);
   const host = url2.host;
+
   if (mediaType.includes("image") && combined.includes(host)) {
     if (tenorURLs.includes(host)) {
-      // Tenor's API tends to be the most reliable way to get a raw GIF,
-      // so we use that if there's a key in the config
       if (process.env.TENOR && process.env.TENOR !== "") {
         let id: string | undefined;
         if (url2.pathname.startsWith("/view/")) {
@@ -157,10 +85,7 @@ async function getMedia(
           `https://tenor.googleapis.com/v2/posts?media_filter=gif&limit=1&client_key=esmBot%20${process.env.ESMBOT_VER}&key=${process.env.TENOR}&ids=${id}`,
         );
         if (data.status === 429) {
-          if (extraReturnTypes) {
-            payload.type = "tenorlimit";
-            return payload;
-          }
+          if (extraReturnTypes) { payload.type = "tenorlimit"; return payload; }
         }
         const json = (await data.json()) as TenorResponse;
         if (json.error) throw Error(json.error.message);
@@ -169,10 +94,8 @@ async function getMedia(
       } else if (url2.pathname.startsWith("/view/")) {
         const tenorURL = url2;
         if (!tenorURL.pathname.endsWith(".gif")) tenorURL.pathname += ".gif";
-
         const redirectReq = await fetch(tenorURL, { method: "HEAD", redirect: "manual" });
         if (redirectReq.status !== 301 && redirectReq.status !== 302) return;
-
         const redirect = redirectReq.headers.get("location");
         if (!redirect) return;
         payload.path = redirect;
@@ -187,10 +110,7 @@ async function getMedia(
       const id = url2.pathname.replace("/gifs/", "");
       const data = await fetch(`https://api.klipy.com/api/v1/${process.env.KLIPY}/gifs/items?slugs=${id}`);
       if (data.status === 429) {
-        if (extraReturnTypes) {
-          payload.type = "klipylimit";
-          return payload;
-        }
+        if (extraReturnTypes) { payload.type = "klipylimit"; return payload; }
       }
       const json = (await data.json()) as KlipyResponse;
       if (json.errors) throw AggregateError(json.errors.message);
@@ -199,7 +119,6 @@ async function getMedia(
       payload.type = "image/gif";
       payload.mediaType = "image";
     } else if (giphyURLs.includes(host)) {
-      // Can result in an HTML page instead of a WEBP
       payload.path = `https://media0.giphy.com/media/${media2.split("/")[4].split("-").pop()}/giphy.webp`;
       payload.type = "image/webp";
       payload.mediaType = "image";
@@ -209,30 +128,7 @@ async function getMedia(
       payload.mediaType = "image";
     }
   } else {
-    let result: MediaTypeData | undefined;
-    if (
-      (mediaURL.host === "cdn.discordapp.com" || mediaURL.host === "media.discordapp.net") &&
-      mediaURL.pathname.match(/^\/(?:ephemeral-)?attachments\/\d+\/\d+\//)
-    ) {
-      let url: URL;
-      if (client && isAttachmentExpired(mediaURL)) {
-        const refreshed = await client.rest.misc.refreshAttachmentURLs([media]);
-        url = new URL(refreshed.refreshedURLs[0].refreshed);
-      } else {
-        url = new URL(media);
-      }
-      if (mediaType.includes("image")) url.searchParams.set("animated", "true");
-      result = await getType(url, extraReturnTypes, mediaType);
-    } else if (
-      mediaType.includes("image") &&
-      (mediaURL.host === "images-ext-1.discordapp.net" || mediaURL.host === "images-ext-2.discordapp.net") &&
-      mediaURL.pathname.match(/^\/external\/[\w-]+\//)
-    ) {
-      mediaURL.searchParams.set("animated", "true");
-      result = await getType(mediaURL, extraReturnTypes, mediaType);
-    } else {
-      result = await getType(mediaURL, extraReturnTypes, mediaType);
-    }
+    const result = await getType(mediaURL, extraReturnTypes, mediaType);
     if (!result) return;
     if (result.url) payload.path = result.url;
     payload.type = type ?? result.type;
@@ -248,276 +144,134 @@ async function getMedia(
   return payload;
 }
 
-/**
- * Checks a single message for media
- */
 async function checkMedia(
-  message: Message,
+  message: FluxerMessage,
   extraReturnTypes: boolean,
   mediaType: MediaParams["type"][],
   singleMessage = false,
 ): Promise<MediaMeta | undefined> {
   let type: MediaMeta | undefined;
 
-  // first check the embeds
-  if (message.embeds.length !== 0) {
-    type = await checkEmbeds(message, extraReturnTypes, mediaType, singleMessage);
+  // Check embeds
+  if (message.embeds?.length !== 0) {
+    type = await checkEmbeds(message.embeds ?? [], message.content ?? "", extraReturnTypes, mediaType, singleMessage);
   }
 
-  // then check the components
-  if (message.components.length !== 0) {
-    type = await checkComponents(message.components, extraReturnTypes, mediaType, singleMessage);
-  }
-
-  // then check the attachments
-  if (!type && message.attachments.size !== 0) {
-    const firstAttachment = message.attachments.first();
-    if (firstAttachment)
-      type = await getMedia(
-        firstAttachment.proxyURL,
-        firstAttachment.url,
-        mediaType,
-        singleMessage,
-        !!(firstAttachment.flags & Constants.AttachmentFlags.IS_SPOILER),
-      );
-  }
-
-  // then check embeds, components, and attachments inside forwards
-  if (!type && message.messageSnapshots?.[0]) {
-    const forward = message.messageSnapshots?.[0].message;
-    if (forward.embeds.length !== 0) type = await checkEmbeds(forward, extraReturnTypes, mediaType, singleMessage);
-    if (forward.components.length !== 0)
-      type = await checkComponents(forward.components, extraReturnTypes, mediaType, singleMessage);
-
-    if (!type && forward.attachments.length !== 0) {
-      type = await getMedia(
-        forward.attachments[0].proxyURL,
-        forward.attachments[0].url,
-        mediaType,
-        singleMessage,
-        !!(forward.attachments[0].flags & Constants.AttachmentFlags.IS_SPOILER),
-      );
+  // Check attachments
+  if (!type && message.attachments?.length !== 0) {
+    const first = message.attachments?.[0];
+    if (first) {
+      const isSpoiler = first.filename.startsWith("SPOILER_");
+      type = await getMedia(first.proxy_url, first.url, mediaType, singleMessage, isSpoiler);
     }
   }
 
-  // if the return value exists then return it
   return type;
 }
 
-function checkComponents(
-  components: MessageComponent[],
-  extraReturnTypes: boolean,
-  mediaType: MediaParams["type"][],
-  singleMessage = false,
-) {
-  for (const component of components) {
-    // full-size image/video
-    if (component.type === Constants.ComponentTypes.MEDIA_GALLERY) {
-      return getMedia(
-        component.items[0].media.proxyURL ?? component.items[0].media.url,
-        component.items[0].media.url,
-        mediaType,
-        singleMessage,
-        component.items[0].spoiler,
-        extraReturnTypes,
-      );
-    }
-    // section thumbnail
-    if (
-      component.type === Constants.ComponentTypes.SECTION &&
-      component.accessory.type === Constants.ComponentTypes.THUMBNAIL
-    ) {
-      return getMedia(
-        component.accessory.media.proxyURL ?? component.accessory.media.url,
-        component.accessory.media.url,
-        mediaType,
-        singleMessage,
-        component.accessory.spoiler,
-        extraReturnTypes,
-      );
-    }
-    // raw file
-    if (component.type === Constants.ComponentTypes.FILE) {
-      return getMedia(
-        component.file.proxyURL ?? component.file.url,
-        component.file.url,
-        mediaType,
-        singleMessage,
-        component.spoiler,
-        extraReturnTypes,
-      );
-    }
-  }
-}
-
 function checkEmbeds(
-  message: Message | MessageSnapshotMessage,
+  embeds: FluxerEmbed[],
+  content: string,
   extraReturnTypes: boolean,
   mediaType: MediaParams["type"][],
   singleMessage = false,
-) {
+): Promise<MediaMeta | undefined> | undefined {
+  if (!embeds[0]) return;
   let hasSpoiler = false;
-  if (message.embeds[0].url && message.content) {
-    const spoilerRegex = /\|\|.*https?:\/\/.*\|\|/s;
-    hasSpoiler = spoilerRegex.test(message.content);
+  if (embeds[0].url && content) {
+    hasSpoiler = /\|\|.*https?:\/\/.*\|\|/s.test(content);
   }
-  // embeds can vary in types, we check for gifvs first
   if (
-    message.embeds[0].provider?.url &&
-    providerUrls.includes(message.embeds[0].provider?.url) &&
-    message.embeds[0].video?.url &&
-    message.embeds[0].url &&
-    (message.embeds[0].provider.url === "https://klipy.com" ? process.env.KLIPY && process.env.KLIPY !== "" : true)
+    embeds[0].provider?.url &&
+    providerUrls.includes(embeds[0].provider.url) &&
+    embeds[0].video?.url &&
+    embeds[0].url
   ) {
+    return getMedia(embeds[0].video.url, embeds[0].url, mediaType, singleMessage, hasSpoiler, extraReturnTypes);
+  } else if (embeds[0].thumbnail) {
     return getMedia(
-      message.embeds[0].video.url,
-      message.embeds[0].url,
+      embeds[0].thumbnail.proxy_url ?? embeds[0].thumbnail.url,
+      embeds[0].thumbnail.url,
       mediaType,
       singleMessage,
       hasSpoiler,
       extraReturnTypes,
     );
-    // then thumbnails
-  } else if (message.embeds[0].thumbnail) {
+  } else if (embeds[0].image) {
     return getMedia(
-      message.embeds[0].thumbnail.proxyURL ?? message.embeds[0].thumbnail.url,
-      message.embeds[0].thumbnail.url,
-      mediaType,
-      singleMessage,
-      hasSpoiler,
-      extraReturnTypes,
-    );
-    // and finally direct images
-  } else if (message.embeds[0].image) {
-    return getMedia(
-      message.embeds[0].image.proxyURL ?? message.embeds[0].image.url,
-      message.embeds[0].image.url,
+      embeds[0].image.proxy_url ?? embeds[0].image.url,
+      embeds[0].image.url,
       mediaType,
       singleMessage,
       hasSpoiler,
       extraReturnTypes,
     );
   }
-}
-
-/**
- * Checks whether an attachment URL has already expired
- */
-function isAttachmentExpired(url: URL): boolean {
-  try {
-    const expiry = url.searchParams.get("ex");
-    return !expiry || expiry.length > 8 || Date.now() >= Number(`0x${expiry}`) * 1000;
-  } catch {
-    // ignore invalid expiration dates
-  }
-  return true;
 }
 
 export async function stickerDetect(
-  client: Client,
-  perms: Permission,
-  cmdMessage?: Message,
-  interaction?: CommandInteraction,
-): Promise<StickerItem | undefined> {
+  client: FluxerClient,
+  cmdMessage?: FluxerMessage,
+): Promise<{ id: string; name: string; format_type: number } | undefined> {
   if (cmdMessage) {
-    // check if the message is a reply to another message
-    if (cmdMessage.messageReference?.channelID && cmdMessage.messageReference.messageID) {
-      const replyMessage = await client.rest.channels
-        .getMessage(cmdMessage.messageReference.channelID, cmdMessage.messageReference.messageID)
+    // Check reply
+    if (cmdMessage.message_reference?.message_id && cmdMessage.message_reference.channel_id) {
+      const replyMessage = await client.rest
+        .getMessage(cmdMessage.message_reference.channel_id, cmdMessage.message_reference.message_id)
         .catch(() => undefined);
-      if (replyMessage?.stickerItems) return replyMessage.stickerItems[0];
+      if (replyMessage?.sticker_items) return replyMessage.sticker_items[0];
     }
-    // then we check the current message
-    if (cmdMessage?.stickerItems) return cmdMessage.stickerItems[0];
-  }
-  if (cmdMessage || interaction?.authorizingIntegrationOwners?.[0] !== undefined) {
-    // if there aren't any replies then iterate over the last few messages in the channel
-    const context = interaction ?? cmdMessage;
-    if (context == null) throw Error("Unknown context");
-    const channel =
-      context.channel ??
-      (await client.rest.channels.get(context.channelID).catch((e) => {
-        logger.warn(`Failed to get a text channel: ${e}`);
-      }));
-    if (
-      !(channel instanceof TextableChannel) &&
-      !(channel instanceof ThreadChannel) &&
-      !(channel instanceof PrivateChannel)
-    )
-      return;
-    if (interaction?.authorizingIntegrationOwners?.[0] !== "0" && perms && !perms.has("READ_MESSAGE_HISTORY")) return;
-    const messages = await channel.getMessages();
-    // iterate over each message
+    if (cmdMessage.sticker_items) return cmdMessage.sticker_items[0];
+
+    // Scan recent messages
+    const messages = await client.rest.getMessages(cmdMessage.channel_id).catch(() => [] as FluxerMessage[]);
     for (const message of messages) {
-      if (message?.stickerItems) return message.stickerItems[0];
+      if (message.sticker_items) return message.sticker_items[0];
     }
   }
 }
 
 /**
- * Checks for the latest message containing media and returns the URL of said media.
+ * Main media detection function.
+ * Checks the invoking message (and its reply) for images/GIFs,
+ * then falls back to scanning recent channel history.
  */
 export default async (
-  client: Client,
-  perms: Permission,
+  client: FluxerClient,
+  perms: bigint,
   mediaType: MediaParams["type"][],
-  cmdMessage?: Message,
-  interaction?: CommandInteraction,
+  cmdMessage?: FluxerMessage,
+  _interaction?: undefined,
   extraReturnTypes = false,
   singleMessage = false,
 ): Promise<MediaMeta | undefined> => {
-  // we start by determining whether or not we're dealing with an interaction or a message
-  if (interaction) {
-    // we can get a raw attachment or a URL in the interaction itself
-    const attachment = interaction.data.options.getAttachment(mediaType.length === 1 ? mediaType[0] : "media");
-    if (attachment) {
-      return getMedia(
-        attachment.proxyURL,
-        attachment.url,
-        mediaType,
-        true,
-        !!(attachment.flags & Constants.AttachmentFlags.IS_SPOILER),
-        !!attachment.contentType,
-      );
-    }
-    const link = interaction.data.options.getString("link");
-    if (link) {
-      return getMedia(link, link, mediaType, true, false, extraReturnTypes, null, interaction.client);
-    }
-  }
   if (cmdMessage) {
-    // check if the message is a reply to another message
-    if (cmdMessage.messageReference?.channelID && cmdMessage.messageReference.messageID && !singleMessage) {
-      const replyMessage = await client.rest.channels
-        .getMessage(cmdMessage.messageReference.channelID, cmdMessage.messageReference.messageID)
+    // Check attachment/link options first (passed via specialArgs by the command)
+    const linkArg = undefined; // links are handled by callers via getOptionString("link")
+
+    // Check reply
+    if (cmdMessage.message_reference?.message_id && cmdMessage.message_reference.channel_id && !singleMessage) {
+      const replyMessage = await client.rest
+        .getMessage(cmdMessage.message_reference.channel_id, cmdMessage.message_reference.message_id)
         .catch(() => undefined);
       if (replyMessage) {
         const replyResult = await checkMedia(replyMessage, extraReturnTypes, mediaType);
         if (replyResult) return replyResult;
       }
     }
-    // then we check the current message
+
+    // Check current message
     const result = await checkMedia(cmdMessage, extraReturnTypes, mediaType, singleMessage);
     if (result) return result;
   }
-  if (!singleMessage && (cmdMessage || interaction?.authorizingIntegrationOwners?.[0] !== undefined)) {
-    // if there aren't any replies or interaction attachments then iterate over the last few messages in the channel
-    const context = interaction ?? cmdMessage;
-    if (context == null) throw Error("Unknown context");
-    const channel =
-      context.channel ??
-      (await client.rest.channels.get(context.channelID).catch((e) => {
-        logger.warn(`Failed to get a text channel: ${e}`);
-      }));
-    if (
-      !(channel instanceof TextableChannel) &&
-      !(channel instanceof ThreadChannel) &&
-      !(channel instanceof PrivateChannel)
-    )
-      return;
-    if (interaction?.authorizingIntegrationOwners?.[0] !== "0" && perms && !perms.has("READ_MESSAGE_HISTORY")) return;
-    const messages = await channel.getMessages();
-    // iterate over each message
+
+  // Scan recent channel history
+  if (!singleMessage && cmdMessage) {
+    const READ_HISTORY_PERM = 0x10000n;
+    if (perms && (perms & READ_HISTORY_PERM) === 0n) return;
+    const messages = await client.rest
+      .getMessages(cmdMessage.channel_id)
+      .catch(() => [] as FluxerMessage[]);
     for (const message of messages) {
       const result = await checkMedia(message, extraReturnTypes, mediaType);
       if (result) return result;

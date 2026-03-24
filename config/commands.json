@@ -1,7 +1,6 @@
 {
   "types": {
-    "classic": true,
-    "application": true
+    "classic": true
   },
   "blacklist": []
 }

@@ -1,236 +1,223 @@
-import {
-  type Client,
-  type CommandInteraction,
-  Constants,
-  type CreateMessageOptions,
-  type InteractionContent,
-  type Member,
-  type Message,
-  type MessageActionRow,
-  type ModalData,
-  type ModalLabel,
-  type StringSelectMenu,
-  type User,
-} from "oceanic.js";
-import { collectors } from "../utils/collections.ts";
-import { getString } from "../utils/i18n.ts";
+/**
+ * pagination.ts
+ *
+ * Reaction-based paginator for Fluxer (no interaction/button support yet).
+ *
+ * Adds four reactions to the paginator message:
+ *   ⏮  — jump to first page
+ *   ◀  — previous page
+ *   ▶  — next page
+ *   ⏭  — jump to last page
+ *   🗑  — delete the message
+ *
+ * When the bot detects one of these reactions from the original command author,
+ * it removes their reaction immediately so they can re-use the same emoji to
+ * navigate further, then edits the message to the new page.
+ *
+ * The collector times out after 2 minutes of inactivity and disables itself
+ * by removing all reactions from the message.
+ */
+
+import type { CreateMessageData, FluxerClient, FluxerMessage, FluxerUser } from "../utils/types.ts";
 import logger from "../utils/logger.ts";
-import InteractionCollector from "./awaitinteractions.ts";
 
-type Info = {
-  author: User | Member;
-  message?: Message;
-  interaction?: CommandInteraction;
+const EMOJIS = {
+  FIRST: "⏮",
+  BACK: "◀",
+  FORWARD: "▶",
+  LAST: "⏭",
+  DELETE: "🗑",
+} as const;
+
+const EMOJI_LIST = Object.values(EMOJIS);
+
+type Page = CreateMessageData;
+
+type PaginatorInfo = {
+  author: FluxerUser;
+  message?: FluxerMessage;
 };
-type Pages = (CreateMessageOptions | InteractionContent)[];
 
-export default async (client: Client, info: Info, pages: Pages): Promise<undefined> => {
-  const options = info.message
-    ? {
-        messageReference: {
-          channelID: info.message.channelID,
-          messageID: info.message.id,
-          guildID: info.message.guildID ?? undefined,
-          failIfNotExists: false,
-        },
-        allowedMentions: {
-          repliedUser: false,
-        },
-      }
-    : {};
-  let page = 0;
-  const components: { components: MessageActionRow[] } & InteractionContent = {
-    components: [
-      {
-        type: 1,
-        components: [
-          {
-            type: 2,
-            label: getString("pagination.back", { locale: info.interaction?.locale ?? undefined }),
-            emoji: {
-              id: null,
-              name: "◀",
-            },
-            style: 1,
-            customID: "back",
-          },
-          {
-            type: 2,
-            label: getString("pagination.forward", { locale: info.interaction?.locale ?? undefined }),
-            emoji: {
-              id: null,
-              name: "▶",
-            },
-            style: 1,
-            customID: "forward",
-          },
-          {
-            type: 2,
-            label: getString("pagination.jump", { locale: info.interaction?.locale ?? undefined }),
-            emoji: {
-              id: null,
-              name: "🔢",
-            },
-            style: 1,
-            customID: "jump",
-          },
-          {
-            type: 2,
-            label: getString("pagination.delete", { locale: info.interaction?.locale ?? undefined }),
-            emoji: {
-              id: null,
-              name: "🗑",
-            },
-            style: 4,
-            customID: "delete",
-          },
-        ],
-      },
-    ],
-  };
-  let currentPage: Message;
-  if (info.message) {
-    currentPage = await client.rest.channels.createMessage(
-      info.message.channelID,
-      Object.assign(pages[page], options, pages.length > 1 ? components : {}),
+// Global registry of active paginators keyed by paginator message ID.
+// The event handler in messageReactionAdd looks up entries here.
+export const activePaginators = new Map<string, PaginatorState>();
+
+export type PaginatorState = {
+  pages: Page[];
+  page: number;
+  authorId: string;
+  channelId: string;
+  messageId: string;
+  client: FluxerClient;
+  timeout: ReturnType<typeof setTimeout>;
+  /** Call this to tear down the paginator (removes reactions, cleans up map). */
+  destroy: (deleteMessage?: boolean) => Promise<void>;
+};
+
+async function addReactions(client: FluxerClient, channelId: string, messageId: string) {
+  for (const emoji of EMOJI_LIST) {
+    try {
+      await client.rest.post(`/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/@me`);
+      // Small delay to avoid hitting rate limits when adding reactions in bulk
+      await new Promise((r) => setTimeout(r, 300));
+    } catch (e) {
+      logger.warn(`Failed to add reaction ${emoji} to message ${messageId}: ${e}`);
+    }
+  }
+}
+
+async function removeUserReaction(
+  client: FluxerClient,
+  channelId: string,
+  messageId: string,
+  emoji: string,
+  userId: string,
+) {
+  try {
+    await client.rest.delete(
+      `/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/${userId}`,
     );
-  } else if (info.interaction) {
-    const response = await info.interaction.createFollowup(
-      Object.assign(pages[page], pages.length > 1 ? components : {}),
-    );
-    currentPage = await response.getMessage();
-    if (!currentPage) currentPage = await info.interaction.getOriginal();
-  } else {
-    throw Error("Unknown pagination context");
+  } catch (e) {
+    logger.warn(`Failed to remove reaction ${emoji} from user ${userId}: ${e}`);
+  }
+}
+
+async function removeAllReactions(client: FluxerClient, channelId: string, messageId: string) {
+  try {
+    await client.rest.delete(`/channels/${channelId}/messages/${messageId}/reactions`);
+  } catch {
+    // Message may have been deleted already — ignore
+  }
+}
+
+export default async function paginator(
+  client: FluxerClient,
+  info: PaginatorInfo,
+  pages: Page[],
+): Promise<undefined> {
+  if (pages.length === 0) return;
+
+  // Send or reply with the first page
+  let currentPage: FluxerMessage;
+  try {
+    if (info.message) {
+      currentPage = await client.rest.createMessage(info.message.channel_id, {
+        ...pages[0],
+        message_reference: {
+          message_id: info.message.id,
+          channel_id: info.message.channel_id,
+          guild_id: info.message.guild_id,
+          fail_if_not_exists: false,
+        },
+        allowed_mentions: { replied_user: false },
+      });
+    } else {
+      throw new Error("No message context provided to paginator");
+    }
+  } catch (e) {
+    logger.error(`Paginator failed to send initial message: ${e}`);
+    return;
   }
 
-  if (pages.length > 1) {
-    const interactionCollector = new InteractionCollector(client);
-    interactionCollector.on("interaction", async (interaction) => {
+  // If there's only one page there's nothing to paginate — don't add reactions
+  if (pages.length === 1) return;
+
+  // Add navigation reactions
+  await addReactions(client, currentPage.channel_id, currentPage.id);
+
+  let currentPageIndex = 0;
+
+  const destroy = async (deleteMsg = false) => {
+    activePaginators.delete(currentPage.id);
+    clearTimeout(state.timeout);
+    if (deleteMsg) {
       try {
-        if (interaction.data.customID !== "jump") await interaction.deferUpdate();
-      } catch (e) {
-        logger.warn(`Could not defer update, cannot continue further with pagination: ${e}`);
-        return;
+        await client.rest.deleteMessage(currentPage.channel_id, currentPage.id);
+      } catch {
+        // already deleted
       }
-      if ((interaction.member ?? interaction.user).id === info.author.id) {
-        if (interaction.isComponentInteraction()) {
-          switch (interaction.data.customID) {
-            case "back":
-              page = page > 0 ? --page : pages.length - 1;
-              try {
-                if (info.interaction) {
-                  currentPage = await info.interaction.editOriginal(Object.assign(pages[page], options));
-                } else {
-                  currentPage = await currentPage.edit(Object.assign(pages[page], options));
-                }
-              } catch (e) {
-                logger.warn(`Failed to navigate to previous page: ${e}`);
-              }
-              interactionCollector.extend();
-              break;
-            case "forward":
-              page = page + 1 < pages.length ? ++page : 0;
-              try {
-                if (info.interaction) {
-                  currentPage = await info.interaction.editOriginal(Object.assign(pages[page], options));
-                } else {
-                  currentPage = await currentPage.edit(Object.assign(pages[page], options));
-                }
-              } catch (e) {
-                logger.warn(`Failed to navigate to next page: ${e}`);
-              }
-              interactionCollector.extend();
-              break;
-            case "jump": {
-              interactionCollector.extend();
-              const jumpModal: ModalData = {
-                customID: "jumpModal",
-                title: getString("pagination.jumpTo", { locale: interaction.locale }),
-                components: [
-                  {
-                    type: Constants.ComponentTypes.LABEL,
-                    label: getString("pagination.pageNumber", { locale: interaction.locale }),
-                    component: {
-                      type: Constants.ComponentTypes.STRING_SELECT,
-                      customID: "seekDropdown",
-                      placeholder: getString("pagination.pageNumber", { locale: interaction.locale }),
-                      options: [],
-                    },
-                  },
-                ],
-              };
-              const start =
-                pages.length > 25 && page > 11
-                  ? pages.length - page > 12
-                    ? Math.max(page - 12, 0)
-                    : pages.length - 25
-                  : 0;
-              let j = 0;
-              for (let i = start; i < pages.length && i < start + 25; i++) {
-                const payload = {
-                  label: (i + 1).toString(),
-                  value: i.toString(),
-                };
-                ((jumpModal.components[0] as ModalLabel).component as StringSelectMenu).options[j] = payload;
-                j++;
-              }
-              try {
-                await interaction.createModal(jumpModal);
-              } catch (e) {
-                logger.warn(`Failed to create pagination jump modal: ${e}`);
-              }
-              break;
-            }
-            case "delete":
-              interactionCollector.emit("end", true);
-              try {
-                if (info.interaction) {
-                  await info.interaction.deleteOriginal();
-                } else {
-                  await currentPage.delete();
-                }
-              } catch (e) {
-                logger.warn(`Failed to delete pagination message: ${e}`);
-              }
-              return;
-            default:
-              break;
-          }
-        } else if (interaction.isModalSubmitInteraction()) {
-          if (interaction.data.customID !== "jumpModal") return;
-          page = Number(interaction.data.components.getStringSelectValues("seekDropdown", true)[0]);
-          if (info.interaction) {
-            currentPage = await info.interaction.editOriginal(Object.assign(pages[page], options, components));
-          } else {
-            currentPage = await currentPage.edit(Object.assign(pages[page], options, components));
-          }
-        }
-      } else {
-        await interaction.createFollowup({
-          content: getString("pagination.cantChangePage", { locale: interaction.locale }),
-          flags: 64,
-        });
-      }
-    });
-    interactionCollector.once("end", async (deleted = false) => {
-      collectors.delete(currentPage.id);
-      interactionCollector.removeAllListeners("interaction");
-      if (!deleted) {
-        for (const index of components.components[0].components.keys()) {
-          components.components[0].components[index].disabled = true;
-        }
-        try {
-          if (info.interaction) {
-            await info.interaction.editOriginal(components);
-          } else {
-            await currentPage.edit(components);
-          }
-        } catch (e) {
-          logger.warn(`Failed to disable pagination buttons: ${e}`);
-        }
-      }
-    });
-    collectors.set(currentPage.id, interactionCollector);
+    } else {
+      await removeAllReactions(client, currentPage.channel_id, currentPage.id);
+    }
+  };
+
+  const resetTimeout = () => {
+    clearTimeout(state.timeout);
+    state.timeout = setTimeout(() => {
+      destroy(false);
+    }, 120_000);
+  };
+
+  const state: PaginatorState = {
+    pages,
+    page: currentPageIndex,
+    authorId: info.author.id,
+    channelId: currentPage.channel_id,
+    messageId: currentPage.id,
+    client,
+    timeout: setTimeout(() => destroy(false), 120_000),
+    destroy,
+  };
+
+  activePaginators.set(currentPage.id, state);
+
+  // The actual reaction handling is done in src/events/messageReactionAdd.ts
+  // which looks up the paginator state from activePaginators and calls
+  // handleReaction() below.
+  return;
+}
+
+/**
+ * Called by the messageReactionAdd event handler when a reaction is added
+ * to a message that has an active paginator.
+ */
+export async function handleReaction(
+  state: PaginatorState,
+  emoji: string,
+  userId: string,
+): Promise<void> {
+  const { client, pages, channelId, messageId } = state;
+
+  // Always remove the user's reaction immediately so they can use it again
+  await removeUserReaction(client, channelId, messageId, emoji, userId);
+
+  let newPage = state.page;
+
+  switch (emoji) {
+    case EMOJIS.FIRST:
+      newPage = 0;
+      break;
+    case EMOJIS.BACK:
+      newPage = state.page > 0 ? state.page - 1 : pages.length - 1;
+      break;
+    case EMOJIS.FORWARD:
+      newPage = state.page < pages.length - 1 ? state.page + 1 : 0;
+      break;
+    case EMOJIS.LAST:
+      newPage = pages.length - 1;
+      break;
+    case EMOJIS.DELETE:
+      await state.destroy(true);
+      return;
+    default:
+      return;
   }
-};
+
+  if (newPage === state.page) return; // already on this page, nothing to do
+
+  state.page = newPage;
+
+  // Edit the message to show the new page
+  try {
+    await client.rest.patch(`/channels/${channelId}/messages/${messageId}`, pages[newPage]);
+  } catch (e) {
+    logger.warn(`Paginator failed to edit message to page ${newPage}: ${e}`);
+    return;
+  }
+
+  // Reset the inactivity timeout
+  clearTimeout(state.timeout);
+  state.timeout = setTimeout(() => state.destroy(false), 120_000);
+}
+
+export { EMOJIS as PAGINATION_EMOJIS };
