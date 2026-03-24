@@ -148,7 +148,6 @@ export class FluxerClientImpl extends EventEmitter implements FluxerClient {
   ready = false;
   guildShardMap = new Map<string, number>();
   shards = new Map<number, { id: number; latency: number; status: string }>();
-  uptime = 0;
 
   private _startTime = Date.now();
   private gateway: WebSocketManager;
@@ -171,7 +170,7 @@ export class FluxerClientImpl extends EventEmitter implements FluxerClient {
       token,
       intents: intents ?? defaultIntents,
       rest: new REST({ api: FLUXER_API, version: API_VERSION }).setToken(token),
-      version: Number(API_VERSION),
+      version: API_VERSION,
     });
 
     this._bindGatewayEvents();
@@ -183,7 +182,7 @@ export class FluxerClientImpl extends EventEmitter implements FluxerClient {
 
   // biome-ignore lint/suspicious/noExplicitAny: gateway emits raw payloads
   private _bindGatewayEvents() {
-    this.gateway.on(WebSocketShardEvents.Dispatch, ({ data }) => {
+    this.gateway.on(WebSocketShardEvents.Dispatch, ({ data }: any) => {
       const { t: eventName, d: eventData } = data as { t: string; d: unknown };
       if (!eventName) return;
 
@@ -298,10 +297,11 @@ export class FluxerClientImpl extends EventEmitter implements FluxerClient {
       }
     });
 
-    this.gateway.on(WebSocketShardEvents.Error, ({ error }) => {
+    this.gateway.on(WebSocketShardEvents.Error, ({ error }: any) => {
       this.emit("error", error);
     });
 
+    // @ts-expect-error: @discordjs/ws type definitions don't expose shardId here but it exists at runtime
     this.gateway.on(WebSocketShardEvents.Hello, ({ shardId }) => {
       logger.debug(`Gateway hello on shard ${shardId}`);
     });
@@ -323,7 +323,7 @@ export class FluxerClientImpl extends EventEmitter implements FluxerClient {
     await this.gateway.send(0, {
       op: GatewayOpcodes.PresenceUpdate,
       d: {
-        status,
+        status: status as any,
         since: null,
         activities: activities.map((a) => ({ type: a.type, name: a.name })),
         afk: false,
@@ -365,3 +365,6 @@ export const PERMISSION_FLAGS = {
 } as const;
 
 export type PermissionFlag = keyof typeof PERMISSION_FLAGS;
+
+// Type alias for convenience - FluxerClient refers to the implementation
+export type { FluxerClient } from "./types.ts";

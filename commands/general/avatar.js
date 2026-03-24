@@ -1,4 +1,3 @@
-import { Member } from "oceanic.js";
 import Command from "#cmd-classes/command.js";
 import { getUser, mentionToObject } from "#utils/mentions.js";
 const imageSize = 512;
@@ -16,7 +15,7 @@ class AvatarCommand extends Command {
     if (this.type === "classic" && this.message?.mentions.users[0])
       return (this.message.mentions.members[0] ?? this.message.mentions.users[0])?.avatarURL(undefined, imageSize);
     if (member && typeof member !== "string") {
-      return (member instanceof Member && !server ? member.user : member).avatarURL(undefined, imageSize);
+      return (member.user && !server ? member.user : member).avatarURL(undefined, imageSize);
     }
     if (member) {
       const user = await mentionToObject(this.client, member, "user", {

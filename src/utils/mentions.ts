@@ -1,10 +1,11 @@
-import type { AnyChannel, Client, Guild, Member, Role, User } from "oceanic.js";
 import { safeBigInt } from "./misc.ts";
+import type { FluxerChannel, FluxerGuild, FluxerMember, FluxerRole, FluxerUser } from "./types.ts";
+import type { FluxerClient } from "./fluxerClient.ts";
 
 const mentionRegex = /^<?[@#]?[&!]?(\d+)>?$/;
 
 interface MentionToObjectParams {
-  guild?: Guild | null;
+  guild?: FluxerGuild | null;
   server?: boolean;
   rest?: boolean;
 }
@@ -12,25 +13,25 @@ interface MentionToObjectParams {
 type MentionTypes = "user" | "role" | "channel";
 
 export async function mentionToObject(
-  client: Client,
+  client: FluxerClient,
   mention: string,
   type: "user",
   options: MentionToObjectParams,
-): Promise<User | Member>;
+): Promise<FluxerUser | FluxerMember>;
 export async function mentionToObject(
-  client: Client,
+  client: FluxerClient,
   mention: string,
   type: "role",
   options: MentionToObjectParams,
-): Promise<Role>;
+): Promise<FluxerRole>;
 export async function mentionToObject(
-  client: Client,
+  client: FluxerClient,
   mention: string,
   type: "channel",
   options: MentionToObjectParams,
-): Promise<AnyChannel>;
+): Promise<FluxerChannel>;
 export async function mentionToObject(
-  client: Client,
+  client: FluxerClient,
   mention: string,
   type: MentionTypes,
   options: MentionToObjectParams,
@@ -63,32 +64,32 @@ function validID(id: string) {
   return safeBigInt(id) > 21154535154122752n;
 }
 
-async function getChannel(client: Client, id: string) {
+async function getChannel(client: FluxerClient, id: string) {
   let channel = client.getChannel(id);
-  if (!channel) channel = await client.rest.channels.get(id);
+  if (!channel) channel = (await client.rest.get(`/channels/${id}`)) as FluxerChannel;
   return channel;
 }
 
-async function getRole(client: Client, guild: Guild, id: string) {
-  let role = guild?.roles.get(id);
-  if (!role && guild) role = await client.rest.guilds.getRole(guild.id, id);
+async function getRole(client: FluxerClient, guild: FluxerGuild, id: string) {
+  let role = guild?.roles.find((r) => r.id === id);
+  if (!role && guild) role = (await client.rest.get(`/guilds/${guild.id}/roles/${id}`)) as FluxerRole;
   return role;
 }
 
 export async function getUser(
-  client: Client,
-  guild: Guild | null | undefined,
+  client: FluxerClient,
+  guild: FluxerGuild | null | undefined,
   id: string,
   member = false,
   rest = false,
-): Promise<Member | User> {
+): Promise<FluxerMember | FluxerUser> {
   let user;
   if (member && guild) {
-    if (!rest) user = guild.members.get(id);
-    if (!user) user = await client.rest.guilds.getMember(guild.id, id);
+    if (!rest) user = guild.members?.find((m) => m.user?.id === id);
+    if (!user) user = (await client.rest.getGuildMember(guild.id, id)) as FluxerMember & { user: FluxerUser };
   } else {
     if (!rest) user = client.users.get(id);
-    if (!user) user = await client.rest.users.get(id);
+    if (!user) user = (await client.rest.getUser(id)) as FluxerUser;
   }
   return user;
 }

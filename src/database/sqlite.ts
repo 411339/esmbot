@@ -9,9 +9,7 @@ import {
   commands,
   disabledCache,
   disabledCmdCache,
-  messageCommands,
   prefixCache,
-  userCommands,
 } from "#utils/collections.js";
 import logger from "#utils/logger.js";
 import type { Count, DBGuild, Tag } from "#utils/types.js";
@@ -104,7 +102,7 @@ export default class SQLitePlugin implements DatabasePlugin {
     const existingCommands = (this.connection.prepare("SELECT command FROM counts").all() as { command: string }[]).map(
       (x) => x.command,
     );
-    const commandNames = [...commands.keys(), ...messageCommands.keys(), ...userCommands.keys()];
+    const commandNames = [...commands.keys()];
     for (const command of commandNames) {
       if (!existingCommands.includes(command)) {
         this.connection.prepare("INSERT INTO counts (command, count) VALUES (?, ?)").run(command, 0);
@@ -152,7 +150,7 @@ export default class SQLitePlugin implements DatabasePlugin {
 
   async getCounts(all?: boolean) {
     const counts = this.connection.prepare("SELECT * FROM counts").all() as Count[];
-    const commandNames = [...commands.keys(), ...messageCommands.keys(), ...userCommands.keys()];
+    const commandNames = [...commands.keys()];
     const countMap = new Map(
       (all ? counts : counts.filter((val) => commandNames.includes(val.command))).map((val) => [
         val.command,

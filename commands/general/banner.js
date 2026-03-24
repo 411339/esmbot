@@ -1,4 +1,3 @@
-import { Member } from "oceanic.js";
 import Command from "#cmd-classes/command.js";
 import { getUser, mentionToObject } from "#utils/mentions.js";
 const imageSize = 4096;
@@ -24,10 +23,10 @@ class BannerCommand extends Command {
     }
     if (member && typeof member !== "string") {
       let restMember;
-      if (member instanceof Member && server && this.guild) {
-        restMember = await this.client.rest.guilds.getMember(this.guild.id, member.id);
+      if (member.user && server && this.guild) {
+        restMember = await this.client.rest.getGuildMember(this.guild.id, member.user.id);
       } else {
-        restMember = await this.client.rest.users.get(member.id);
+        restMember = await this.client.rest.getUser(member.id ?? member.user?.id);
       }
       return (
         restMember.bannerURL(undefined, imageSize) ??

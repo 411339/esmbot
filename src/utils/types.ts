@@ -186,6 +186,7 @@ export interface MediaParams {
   name?: string;
   onlyAnim?: boolean;
   spoiler?: boolean;
+  token?: string;
 }
 
 export interface MediaTypeData {

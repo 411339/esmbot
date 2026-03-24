@@ -1,6 +1,5 @@
 import { createServer } from "node:http";
 import { availableParallelism } from "node:os";
-import type { ShardStatus } from "oceanic.js";
 import logger from "#utils/logger.js";
 import { init as dbInit } from "../database.ts";
 
@@ -8,7 +7,7 @@ export type ShardData = {
   id: number;
   procId: number;
   latency: number;
-  status: ShardStatus;
+  status: string;
 };
 
 type BaseProcMessage = {

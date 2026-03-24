@@ -1,6 +1,5 @@
 import os from "node:os";
 import process from "node:process";
-import { VERSION } from "oceanic.js";
 import Command from "#cmd-classes/command.js";
 import detectRuntime from "#utils/detectRuntime.js";
 import { getServers } from "#utils/misc.js";
@@ -77,7 +76,7 @@ class StatsCommand extends Command {
             },
             {
               name: this.getString("commands.responses.stats.library"),
-              value: `Oceanic ${VERSION}`,
+              value: "Fluxer",
               inline: true,
             },
             {

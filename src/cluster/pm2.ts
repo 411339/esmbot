@@ -1,5 +1,6 @@
 import "dotenv/config";
 import process from "node:process";
+// @ts-ignore - pm2 is an optional dependency for clustering
 import pm2, { type ProcessDescription } from "pm2";
 import logger from "#utils/logger.js";
 import {
@@ -41,7 +42,7 @@ process.on("message", async (packet: IncomingProcMessage) => {
 
 function getProcesses(): Promise<ProcessDescription[]> {
   return new Promise((resolve, reject) => {
-    pm2.list((err, list) => {
+    pm2.list((err: Error | null, list: ProcessDescription[]) => {
       if (err) reject(err);
       resolve(list.filter((v) => v.name?.includes("esmBot-proc")));
     });
@@ -97,13 +98,15 @@ if (process.env.METRICS && process.env.METRICS !== "") {
       };
     },
     (id) => {
-      pm2.restart(id, (e) => logger.error(e));
+      pm2.restart(id, (e: Error | null) => {
+        if (e) logger.error(e);
+      });
       return true;
     },
     async () => {
       for (let i = 1; i <= clusterCount; i++) {
         await new Promise<void>((resolve, reject) => {
-          pm2.restart(i, (e) => {
+          pm2.restart(i, (e: Error | null) => {
             if (e) return reject(e);
             resolve();
           });
@@ -168,7 +171,7 @@ function awaitStart(i: number, shardArray: number[]): Promise<void> {
           CLUSTER_TYPE: "pm2",
         },
       },
-      (err) => {
+      (err: Error | null) => {
         if (err) {
           logger.error(`Failed to start esmBot process ${i}: ${err}`);
           process.exit(0);

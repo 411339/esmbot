@@ -3,7 +3,6 @@ import { Buffer } from "node:buffer";
 import EventEmitter from "node:events";
 import { createServer } from "node:http";
 import process from "node:process";
-import { DiscordHTTPError, DiscordRESTError, type RawMessage } from "oceanic.js";
 import type WSocket from "ws";
 import { WebSocketServer, type ErrorEvent } from "ws";
 import logger from "#utils/logger.js";
@@ -376,7 +375,7 @@ async function finishJob(
 
   jobs.set(job.id, jobObject);
   jobs.markFinished(job.id);
-  let r: RawMessage | undefined;
+  let r: Record<string, unknown> | undefined;
   if (clientID && object.token && allowedExtensions.includes(jobObject.ext) && jobObject.data.length < fileSize) {
     const form = new FormData();
     form.set(
@@ -406,9 +405,10 @@ async function finishJob(
             throw new Error(`Request failed with response ${res.status}`);
           }
         }
-        throw new (typeof resObj === "string" ? DiscordHTTPError : DiscordRESTError)(res, resObj, "POST");
+        const errMsg = typeof resObj === "string" ? resObj : JSON.stringify(resObj);
+        throw new Error(`HTTP ${res.status}: ${errMsg}`);
       }
-      r = (await res.json()) as RawMessage;
+      r = (await res.json()) as Record<string, unknown>;
     } catch (e) {
       error(`Error while sending job ${job.id}, will attempt to send back to the bot: ${e}`, job.num);
     }
@@ -417,7 +417,8 @@ async function finishJob(
   let response: Buffer;
   if (r) {
     jobs.delete(job.id);
-    const attachment = r.attachments[0];
+    const attachments = r.attachments as Record<string, unknown>[] | undefined;
+    const attachment = attachments?.[0];
     response = Buffer.concat([Buffer.from([Rsent]), tag, Buffer.from(JSON.stringify(attachment ?? {}))]);
   } else {
     response = Buffer.concat([Buffer.from([Rwait]), tag]);

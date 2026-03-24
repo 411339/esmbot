@@ -8,8 +8,6 @@ class CountCommand extends Command {
     const cmd = (this.getOptionString("command") ?? this.args.join(" ")).trim();
     const merged = [
       ...collections.commands.keys(),
-      ...collections.messageCommands.keys(),
-      ...collections.userCommands.keys(),
     ];
     if (cmd && (merged.includes(cmd) || collections.aliases.has(cmd))) {
       const command = collections.aliases.get(cmd) ?? cmd;

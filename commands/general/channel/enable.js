@@ -1,4 +1,3 @@
-import { GuildChannel } from "oceanic.js";
 import Command from "#cmd-classes/command.js";
 import { safeBigInt } from "#utils/misc.js";
 
