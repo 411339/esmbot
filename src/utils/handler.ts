@@ -126,3 +126,19 @@ export const flagMap: string[] = [
   "number",
   "attachment",
 ];
+
+/**
+ * Convert a flag type string to its index in flagMap
+ * Used for help command formatting
+ */
+export function convFlagType(type: string): number {
+  return flagMap.indexOf(type);
+}
+
+/**
+ * Send command data to Discord (stub for Fluxer)
+ * Fluxer does not support slash commands yet, so this is a no-op
+ */
+export async function send(): Promise<void> {
+  // Fluxer does not support slash commands, so nothing to send
+}

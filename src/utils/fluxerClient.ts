@@ -183,6 +183,7 @@ export class FluxerClientImpl extends EventEmitter implements FluxerClient {
   // biome-ignore lint/suspicious/noExplicitAny: gateway emits raw payloads
   private _bindGatewayEvents() {
     this.gateway.on(WebSocketShardEvents.Dispatch, ({ data }: any) => {
+      if (!data) return;
       const { t: eventName, d: eventData } = data as { t: string; d: unknown };
       if (!eventName) return;
 

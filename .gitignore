@@ -140,3 +140,5 @@ dist/
 
 # macOS temp dirs
 **/.DS_Store
+
+error.log
