@@ -1,0 +1,612 @@
+{
+    "commands": {
+        "descriptions": {
+            "bounce": "Faz uma imagem saltar para cima e para baixo",
+            "caption": "Adiciona uma legenda na imagem",
+            "bird": "Mostra uma imagem de pássaro aleatória",
+            "dice": "Joga o dado",
+            "dog": "Mostra uma imagem de cachorro aleatória",
+            "homebrew": "Cria uma edição do Homebrew Channel",
+            "sonic": "Cria uma imagem de balão de fala do Sonic",
+            "banner": "Mostra o banner de um usuário",
+            "base64": "Codifica/Decodifica uma chave de Base64",
+            "command": "Liga/desliga um comando clássico para um servidor (use as config. do serv. para comandos de barra)",
+            "count": "Mostra quantas vezes cada comando foi usado",
+            "donate": "Aprenda mais sobre como você pode ajudar no desenvolvimento do esmBot",
+            "emote": "Pega a imagem original de um emoji",
+            "eval": "Roda código JavaScript",
+            "exec": "Roda um comando de terminal/shell",
+            "help": "Mostra uma lista de comandos",
+            "8ball": "Faz uma pergunta para a bola 8 mágica",
+            "cat": "Mostra uma imagem de gato aleatória",
+            "avatar": "Mostra o avatar de um usuário",
+            "channel": "Liga/desliga comandos clássicos em um canal (use as config. do servidor para comandos de barra)",
+            "image": "Pesquisar por imagens na web",
+            "broadcast": "Transmite uma mensagem em reprodução até que o comando se repita ou o bot reinicie",
+            "lengthen": "Alonga um URL curto",
+            "ping": "Dá um Ping nos servidores do Discord",
+            "hooh": "Espelha a superfície da imagem no topo",
+            "snapchat": "Adiciona uma legenda no estilo Snapchat na imagem",
+            "speechbubble": "Adiciona um balão de fala na imagem",
+            "stats": "Mostra algumas estatísticas sobre mim",
+            "soundreload": "Tenta reconectar à todos nodes Lavalink disponíveis",
+            "prefix": "Verifica/muda o prefixo do servidor",
+            "youtube": "Pesquisa no YouTube",
+            "blur": "Desfoque uma imagem",
+            "snowflake": "Converte um snowflake id do Discord em uma timestamp",
+            "reload": "Recarrega um command",
+            "invert": "Inverte a imagem",
+            "jpeg": "Adiciona uma compressão de JPEG para a imagem",
+            "magik": "Adiciona o efeito de escala sensível a conteúdo na imagem",
+            "crop": "Corta a imagem para 1:1",
+            "circle": "Aplica um efeito de desfoque radial na imagem",
+            "caption2": "Adiciona uma legenda inferior/lista de tags na imagem",
+            "reddit": "Adiciona uma marca d'agua do Reddit na imagem",
+            "restart": "Reinicia-me",
+            "info": "Mostra algumas informações e créditos sobre mim",
+            "raw": "Pega um URL direto para a imagem (útil para salvar GIFs de sites como Tenor)",
+            "explode": "Explode a imagem",
+            "freeze": "Faz uma sequência de imagem tocar uma só vez",
+            "uncanny": "Faz uma imagem do Sr. Incrível Fica Uncanny (separe o texto da esquerda/direita com uma vírgula)",
+            "flag": "Sobrepõe uma bandeira em uma imagem",
+            "gamexplain": "Faz uma thumbnail do GameXplain de uma imagem",
+            "gif": "Converte a imagem em GIF",
+            "grayscale": "Adiciona um filtro em escala de cinza",
+            "sepia": "Adiciona um filtro em sépia",
+            "scott": "Faz o Scott the Woz mostrar a imagem",
+            "motivate": "Gera um pôster motivacional",
+            "spin": "Gira a imagem",
+            "spotify": "Adiciona o cabeçalho \"This is\" do Spotify na imagem",
+            "stretch": "Estica a imagem para uma proporção de tela 1:1",
+            "uncaption": "Remove a legenda da imagem",
+            "wall": "Cria uma parede de uma imagem",
+            "mediareload": "Tenta reconectar a todos os servidores de processamento de mídia",
+            "mediastats": "Obtém algumas estatísticas sobre os servidores de mídia",
+            "sticker": "Obtém a foto original de uma figurinha",
+            "deepfry": "Frita uma imagem",
+            "fade": "Dá um fade-in numa imagem",
+            "flip": "Vira uma imagem",
+            "flop": "Vira uma imagem",
+            "globe": "Gira uma imagem",
+            "haah": "Espelha o lado esquerdo de uma imagem no lado direito",
+            "implode": "Implode uma imagem",
+            "meme": "Gera um meme com uma imagem (separe texto de cima/baixo com uma vírgula)",
+            "pixelate": "Pixeliza uma imagem",
+            "reverse": "Reverte uma sequência de imagens",
+            "sharpen": "Aplica nitidez numa imagem",
+            "slide": "Desliza uma imagem em uma direção",
+            "slow": "Deixa uma sequência de imagens mais lenta",
+            "soos": "\"Loopa\" uma sequência de imagens revertendo-a quando ela termina",
+            "speed": "Agiliza uma sequência de imagens",
+            "squish": "Estica/encolhe uma imagem",
+            "tile": "Cria um padrão lado-a-lado de uma imagem",
+            "waaw": "Espelha o lado direito de uma imagem para a esquerda",
+            "whisper": "Adiciona uma legenda estilo Whisper em uma imagem",
+            "woow": "Espelha o topo de uma imagem até a parte de baixo",
+            "Select Image": "Descrição não encontrada",
+            "tags": "O comando de tags principal. Veja a página de ajuda para informações: https://esmbot.net/help.html"
+        },
+        "flagNames": {
+            "caption": {
+                "font": "fonte",
+                "noegg": "semovo"
+            },
+            "8ball": {
+                "question": "pergunta"
+            },
+            "dice": {
+                "max": "máximo"
+            },
+            "avatar": {
+                "member": "membro"
+            },
+            "banner": {
+                "member": "membro"
+            },
+            "base64": {
+                "decode": "decodificar",
+                "encode": "codificar"
+            },
+            "base64 decode": {
+                "text": "texto"
+            },
+            "base64 encode": {
+                "text": "texto"
+            },
+            "broadcast": {
+                "message": "mensagem"
+            },
+            "channel": {
+                "enable": "ativar",
+                "disable": "desativar"
+            },
+            "channel enable": {
+                "text": "texto"
+            },
+            "channel disable": {
+                "text": "texto"
+            },
+            "command": {
+                "enable": "ativar",
+                "disable": "desativar"
+            },
+            "command enable": {
+                "text": "texto"
+            },
+            "command disable": {
+                "text": "texto"
+            },
+            "count": {
+                "command": "comando"
+            },
+            "emote": {
+                "emoji": "emoji"
+            },
+            "eval": {
+                "broadcast": "transmissão",
+                "code": "código"
+            },
+            "exec": {
+                "cmd": "cmd"
+            },
+            "help": {
+                "command": "comando"
+            },
+            "image": {
+                "query": "pesquisa"
+            },
+            "lengthen": {
+                "url": "url"
+            },
+            "prefix": {
+                "prefix": "prefixo"
+            },
+            "reload": {
+                "cmd": "cmd",
+                "skipsend": "pularenvio"
+            },
+            "snowflake": {
+                "id": "id"
+            },
+            "youtube": {
+                "query": "pesquisa"
+            },
+            "caption2": {
+                "top": "topo",
+                "font": "fonte"
+            },
+            "fade": {
+                "alpha": "alfa"
+            },
+            "globe": {
+                "snow": "neve"
+            },
+            "jpeg": {
+                "quality": "qualidade"
+            },
+            "meme": {
+                "font": "fonte"
+            },
+            "motivate": {
+                "font": "fonte"
+            },
+            "slide": {
+                "reverse": "reverter",
+                "vertical": "vertical"
+            },
+            "snapchat": {
+                "position": "posição"
+            },
+            "uncanny": {
+                "font": "fonte"
+            },
+            "uncaption": {
+                "tolerance": "tolerância"
+            },
+            "watermark": {
+                "9gag": "9gag",
+                "avs4you": "avs4you",
+                "bandicam": "bandicam",
+                "deviantart": "deviantart",
+                "hypercam": "hypercam",
+                "ifunny": "ifunny",
+                "kinemaster": "kinemaster",
+                "memecenter": "memecenter",
+                "powerdirector": "powerdirector",
+                "shutterstock": "shutterstock"
+            },
+            "music": {
+                "loop": "repetir",
+                "nowplaying": "agoratocando",
+                "play": "tocar",
+                "queue": "fila",
+                "remove": "remover",
+                "shuffle": "aleatório",
+                "skip": "pular",
+                "stop": "parar",
+                "toggle": "alternar",
+                "volume": "volume"
+            },
+            "music host": {
+                "user": "usuário"
+            },
+            "music remove": {
+                "position": "posição"
+            },
+            "music seek": {
+                "position": "posição"
+            },
+            "music volume": {
+                "level": "nível"
+            },
+            "tags": {
+                "add": "adicionar",
+                "delete": "apagar",
+                "edit": "editar",
+                "list": "lista",
+                "owner": "dono",
+                "random": "aleatório",
+                "role": "cargo"
+            },
+            "tags add": {
+                "name": "nome",
+                "content": "conteúdo"
+            },
+            "tags delete": {
+                "name": "nome"
+            },
+            "tags edit": {
+                "name": "nome",
+                "content": "conteúdo"
+            },
+            "tags get": {
+                "name": "nome"
+            },
+            "tags owner": {
+                "name": "nome"
+            },
+            "tags role": {
+                "add": "adicionar",
+                "list": "lista",
+                "remove": "remover"
+            },
+            "tags role add": {
+                "role": "cargo"
+            },
+            "tags role remove": {
+                "role": "cargo"
+            },
+            "qr": {
+                "create": "criar",
+                "read": "ler"
+            }
+        },
+        "flags": {
+            "caption": {
+                "font": "Especifica a fonte que deseja usar (padrão: futura)",
+                "noegg": "Desativa... algo. Não vou dizer o que é."
+            },
+            "8ball": {
+                "question": "Uma pergunta que você quer perguntar à bola"
+            },
+            "dice": {
+                "max": "O valor máximo do dado"
+            },
+            "avatar": {
+                "member": "O membro para obter o avatar"
+            },
+            "banner": {
+                "member": "O membro para obter o banner"
+            },
+            "base64": {
+                "decode": "Decodificar uma chave Base64",
+                "encode": "Codificar uma chave Base64"
+            },
+            "base64 decode": {
+                "text": "O texto para decodificar"
+            },
+            "base64 encode": {
+                "text": "O texto para codificar"
+            },
+            "broadcast": {
+                "message": "A mensagem para transmitir"
+            },
+            "channel": {
+                "enable": "Ativa comandos clássicos num canal",
+                "disable": "Desativa comandos clássicos num canal"
+            },
+            "channel enable": {
+                "text": "O texto para decodificar"
+            },
+            "channel disable": {
+                "text": "O texto para codificar"
+            },
+            "command": {
+                "enable": "Ativa um comando clássico",
+                "disable": "Desativa um comando clássico"
+            },
+            "command enable": {
+                "text": "O texto para decodificar"
+            },
+            "command disable": {
+                "text": "O texto para codificar"
+            },
+            "emote": {
+                "emoji": "O emoji que quer obter"
+            },
+            "eval": {
+                "code": "O código para executar"
+            },
+            "exec": {
+                "cmd": "O comando para executar"
+            },
+            "help": {
+                "command": "O comando para ver informações sobre"
+            },
+            "image": {
+                "query": "O que você quer pesquisar"
+            },
+            "lengthen": {
+                "url": "O URL que você quer deixar mais longo"
+            },
+            "prefix": {
+                "prefix": "O prefixo de servidor que você quer usar"
+            },
+            "reload": {
+                "cmd": "O comando para recarregar",
+                "skipsend": "Pula o envio de novos dados de comando de aplicativo para o Discord"
+            },
+            "snowflake": {
+                "id": "Um ID snowflake"
+            },
+            "youtube": {
+                "query": "O que você quer pesquisar"
+            },
+            "caption2": {
+                "top": "Coloca a legenda no topo da imagem ao invés do fundo",
+                "font": "Especifique a fonte que você quer usar (padrão: helvetica)"
+            },
+            "fade": {
+                "alpha": "Fade in transparente"
+            },
+            "freeze": {
+                "endframe": "Define o frame final (padrão: último frame)"
+            },
+            "globe": {
+                "snow": "Transforma o globo em um globo de neve"
+            },
+            "jpeg": {
+                "quality": "Define a qualidade do JPEG (padrão: 1)"
+            },
+            "meme": {
+                "case": "Deixa o meme case-sensitive (permite texto em minúsculo)",
+                "font": "Especifique a fonte que você quer usar (padrão: impact)"
+            },
+            "motivate": {
+                "font": "Especifique a fonte que você quer usar (padrão: times)"
+            },
+            "slide": {
+                "reverse": "Muda a direção a qual a imagem desliza",
+                "vertical": "Desliza a imagem verticalmente"
+            },
+            "slow": {
+                "multiplier": "Define o fator de velocidade (padrão: 2.0)"
+            },
+            "speechbubble": {
+                "alpha": "Deixa o topo da bolha de fala transparente",
+                "flip": "Vira a bolha de fala",
+                "bottom": "Coloca a bolha de fala no fundo da imagem"
+            },
+            "speed": {
+                "multiplier": "Define o fator de velocidade (padrão: 2.0)"
+            },
+            "uncanny": {
+                "font": "Especifique a fonte que você quer usar (padrão: helvetica)",
+                "phase": "Especifique a imagem uncanny que você quer usar"
+            },
+            "watermark": {
+                "9gag": "Adiciona a marca d'água do 9GAG em uma imagem",
+                "avs4you": "Adiciona a marca d'água do avs4you em uma imagem",
+                "bandicam": "Adiciona a marca d'água do Bandicam em uma imagem",
+                "deviantart": "Adiciona a marca d'água do DeviantArt em uma imagem",
+                "hypercam": "Adiciona a marca d'água do Hypercam em uma imagem",
+                "ifunny": "Adiciona a marca d'água do iFunny em uma imagem",
+                "kinemaster": "Adiciona a marca d'água do KineMaster em uma imagem",
+                "memecenter": "Adiciona a marca d'água do MemeCenter em uma imagem",
+                "powerdirector": "Adiciona a marca d'água do PowerDirector em uma imagem",
+                "shutterstock": "Adiciona a marca d'água do Shutterstock em uma imagem"
+            },
+            "music": {
+                "host": "Obtém ou muda o anfitrião da atual sessão de voz",
+                "loop": "Repete a música",
+                "nowplaying": "Mostra a música atual",
+                "play": "Toca uma música ou adiciona à fila",
+                "queue": "Mostra a fila atual",
+                "remove": "Remove uma música da fila",
+                "shuffle": "Embaralha a fila de músicas",
+                "skip": "Pula a música atual",
+                "stop": "Para a música",
+                "toggle": "Pausa ou resume a música atual",
+                "volume": "Define o volume da música"
+            },
+            "music remove": {
+                "position": "A posição na fila que você quer remover"
+            },
+            "music volume": {
+                "level": "O nível de volume"
+            },
+            "tags": {
+                "add": "Adiciona uma nova etiqueta",
+                "delete": "Apaga uma etiqueta",
+                "edit": "Edita uma etiqueta existente",
+                "get": "Obtém uma etiqueta",
+                "list": "Lista todas as etiquetas neste servidor",
+                "owner": "Obtém o dono de uma etiqueta",
+                "random": "Obtém uma etiqueta aleatória"
+            },
+            "tags add": {
+                "name": "O nome de uma etiqueta",
+                "content": "O conteúdo de uma etiqueta"
+            },
+            "tags delete": {
+                "name": "O nome da etiqueta"
+            },
+            "tags edit": {
+                "name": "O nome da etiqueta",
+                "content": "O conteúdo da etiqueta"
+            },
+            "tags get": {
+                "name": "O nome da etiqueta"
+            },
+            "tags owner": {
+                "name": "O nome da etiqueta"
+            },
+            "tags role": {
+                "add": "Permite um cargo a gerenciar etiquetas",
+                "list": "Lista os cargos que são capazes de gerenciar etiquetas",
+                "remove": "Remove um cargo da permissão"
+            },
+            "tags role add": {
+                "role": "O cargo a adicionar"
+            },
+            "tags role remove": {
+                "role": "O cargo a remover"
+            },
+            "qr": {
+                "create": "Gera um QR code",
+                "read": "Lê um QR code"
+            }
+        },
+        "names": {
+            "bounce": "saltar",
+            "caption": "legendar",
+            "Select Image": "Selecionar Imagem",
+            "8ball": "bola8",
+            "bird": "pássaro",
+            "cat": "gato",
+            "dice": "dado",
+            "dog": "cachorro",
+            "homebrew": "homebrew",
+            "sonic": "sonic",
+            "avatar": "avatar",
+            "banner": "banner",
+            "base64": "base64",
+            "broadcast": "transmissão",
+            "channel": "canal",
+            "command": "comando",
+            "count": "contagem",
+            "donate": "doar",
+            "emote": "emote",
+            "eval": "eval",
+            "exec": "exec",
+            "help": "ajuda",
+            "image": "imagem",
+            "mediareload": "recarregarmídia",
+            "mediastats": "estatísticasdemídia",
+            "info": "informações",
+            "ping": "ping",
+            "prefix": "prefixo",
+            "raw": "bruto",
+            "reload": "recarregar",
+            "restart": "reiniciar",
+            "snowflake": "snowflake",
+            "soundreload": "recarregarsom",
+            "stats": "estatísticas",
+            "sticker": "adesivo",
+            "youtube": "youtube",
+            "blur": "desfoque",
+            "caption2": "legenda2",
+            "circle": "círculo",
+            "crop": "recortar",
+            "deepfry": "fritar",
+            "explode": "explodir",
+            "fade": "fade",
+            "flag": "bandeira",
+            "flip": "virar",
+            "freeze": "congelar",
+            "gif": "gif",
+            "globe": "globo",
+            "grayscale": "pretoebranco",
+            "haah": "haah",
+            "hooh": "hooh",
+            "implode": "implodir",
+            "invert": "inverter",
+            "jpeg": "jpeg",
+            "magik": "magik",
+            "meme": "meme",
+            "motivate": "motivacional",
+            "pixelate": "pixelizar",
+            "reddit": "reddit",
+            "reverse": "reverter",
+            "scott": "scott",
+            "sepia": "sepia",
+            "sharpen": "nitidez",
+            "slide": "deslizar",
+            "slow": "diminuirvelocidade",
+            "snapchat": "snapchat",
+            "soos": "soos",
+            "speechbubble": "bolhadefala",
+            "speed": "aumentarvelocidade",
+            "spin": "girar",
+            "spotify": "spotify",
+            "tile": "ladoalado",
+            "uncanny": "uncanny",
+            "uncaption": "removerlegenda",
+            "unfreeze": "descongelar",
+            "waaw": "waaw"
+        },
+        "noImage": {
+            "bounce": "Você precisa enviar uma imagem/GIF para saltar!",
+            "caption": "Você precisa enviar uma imagem/GIF para adicionar legenda!"
+        },
+        "noParam": {
+            "caption": "Você precisa enviar texto para colocar na legenda!"
+        }
+    },
+    "error": "Opa! Encontrei um erro ao executar este comando. Informe o conteúdo do arquivo anexado no link a seguir ou no servidor de suporte do esmBot:",
+    "image": {
+        "badurl": "Esse link é inválido!",
+        "couldNotFind": "Não pude encontrar uma imagem nessa mensagem!",
+        "empty": "O resultado estava vazio!",
+        "flagNames": {
+            "ephemeral": "efêmero",
+            "image": "imagem",
+            "text": "texto",
+            "togif": "paragif"
+        },
+        "flags": {
+            "ephemeral": "Tenta enviar o resultado como uma resposta efêmera/temporária",
+            "image": "Um anexo de uma imagem/GIF",
+            "link": "Um link de uma imagem/GIF",
+            "spoiler": "Tenta enviar o resultado como spoiler",
+            "text": "O texto para colocar na imagem",
+            "togif": "Força resultado como GIF"
+        },
+        "frames": "Esse GIF tem muitas frames (mais de 1000)!",
+        "jobEnded": "Algo aconteceu com os servidores de imagem antes que eu pudesse receber a imagem. Tente executar seu comando novamente.",
+        "large": "Essa imagem é muito grande (>= 40MB)! Tente usar uma imagem menor.",
+        "nocmd": "Esse comando não é compatível com esta instância do esmBot.",
+        "noanim": "Essa imagem não está em um formato animado (GIF ou WEBP)!",
+        "noImage": "Você precisa enviar uma imagem/GIF!",
+        "noResult": "Não consegui obter uma resposta do servidor de imagens. Por favor, tente novamente.",
+        "noServers": "Parece que não consigo entrar em contato com os servidores de imagem, eles podem estar inativos ou ainda iniciando. Por favor, aguarde um pouco.",
+        "noTempServer": "A imagem resultante era maior do que o limite de upload do Discord, então não posso carregá-la.",
+        "noParam": "Você precisa enviar texto!",
+        "processing": "Processando... isto vai demorar um pouco",
+        "ratelimit": "Fui limitado pelo serviço que hospeda essa imagem. Tente enviar sua imagem em outro lugar.",
+        "selected": "A imagem foi selecionada para o seu próximo comando.",
+        "slowDown": "Por favor, diminua a velocidade um pouco.",
+        "tempImageSent": "Aqui está sua imagem!",
+        "tempSite": "A imagem resultante era maior do que o limite de upload do Discord, portanto, foi enviada para um site externo.",
+        "tenor": "Fui limitado pelo Tenor. Tente enviar seu GIF em outro lugar.",
+        "timeout": "A solicitação para obter essa imagem atingiu o tempo limite. Tente novamente, envie sua imagem em outro lugar ou use outra imagem.",
+        "tip": "(Dica: tente clicar com o botão direito do mouse/manter pressionado em uma mensagem e pressione Apps -> Selecionar Imagem. Em seguida, tente novamente.)",
+        "tooLarge": "O arquivo resultante era muito grande para ser enviado. Tente novamente com uma imagem menor, se possível.",
+        "tooLong": "A imagem está demorando muito para ser processada (>=10 minutos), por isso o processsamento foi cancelado. Tente usar uma imagem menor.",
+        "tryAgain": "Não foi possível concluir o processamento dessa imagem porque o servidor em que ela estava sendo processada caiu. Tente executar seu comando novamente.",
+        "unknown": "A imagem resultante não estava em um formato reconhecível. Tente novamente."
+    },
+    "permissions": {
+        "noAttachFiles": "Não tenho a permissão de anexar arquivos!"
+    }
+}

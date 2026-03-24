@@ -1,0 +1,29 @@
+import MediaCommand from "#cmd-classes/mediaCommand.js";
+
+class UncaptionCommand extends MediaCommand {
+  paramsFunc() {
+    const tolerance = this.getOptionNumber("tolerance");
+    return {
+      tolerance: tolerance == null || Number.isNaN(tolerance) ? 0.95 : tolerance,
+    };
+  }
+
+  static init() {
+    super.init();
+    this.flags.push({
+      name: "tolerance",
+      type: "number",
+      description: "Set the shade tolerance for the caption detection (0.0 is highest, 1.0 is lowest, default is 0.95)",
+      minValue: 0,
+      maxValue: 1,
+    });
+    return this;
+  }
+
+  static description = "Removes the caption from an image";
+
+  static noImage = "You need to provide an image/GIF to uncaption!";
+  static command = "uncaption";
+}
+
+export default UncaptionCommand;
