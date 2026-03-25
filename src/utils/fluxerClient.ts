@@ -31,8 +31,8 @@ import type {
 
 export { GatewayDispatchEvents };
 
-const FLUXER_API = "https://api.fluxer.app";
-const API_VERSION = "1";
+const FLUXER_API = "https://api.fluxer.app/v1";
+// Note: Fluxer API version is part of the base URL
 
 // ─── REST client ─────────────────────────────────────────────────────────────
 
@@ -40,7 +40,7 @@ class FluxerREST implements FluxerRESTClient {
   private rest: REST;
 
   constructor(token: string) {
-    this.rest = new REST({ api: FLUXER_API, version: API_VERSION }).setToken(token);
+    this.rest = new REST({ api: FLUXER_API }).setToken(token);
   }
 
   async post(path: string, body?: unknown): Promise<unknown> {
@@ -67,7 +67,7 @@ class FluxerREST implements FluxerRESTClient {
     }
     // Use raw fetch so we can send multipart
     const token = (this.rest as unknown as { token: string }).token;
-    const res = await fetch(`${FLUXER_API}/v${API_VERSION}${path}`, {
+    const res = await fetch(`${FLUXER_API}${path}`, {
       method: "POST",
       headers: { Authorization: `Bot ${token}` },
       body: formData,
@@ -169,7 +169,7 @@ export class FluxerClientImpl extends EventEmitter implements FluxerClient {
     this.gateway = new WebSocketManager({
       token,
       intents: intents ?? defaultIntents,
-      rest: new REST({ api: FLUXER_API, version: API_VERSION }).setToken(token),
+      rest: new REST({ api: FLUXER_API }).setToken(token),
     });
 
     this._bindGatewayEvents();
