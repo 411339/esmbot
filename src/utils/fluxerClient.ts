@@ -34,6 +34,24 @@ export { GatewayDispatchEvents };
 const FLUXER_API = "https://api.fluxer.app";
 // Note: Fluxer API routes are at /v1, handled in each request path
 
+// ─── Custom REST for Fluxer ──────────────────────────────────────────────────
+
+/**
+ * Create a REST instance for Fluxer that rewrites URLs from Discord's /v10 to /v1.
+ * REST hard-codes API versions to Discord versions, so we provide a custom
+ * makeRequest handler to rewrite URLs before sending.
+ */
+function createFluxerREST(token: string) {
+  return new REST({
+    api: FLUXER_API,
+    makeRequest: async (url: string, init: any) => {
+      // Rewrite Discord version URLs (/v10, /v9, etc.) to Fluxer's /v1
+      const rewrittenUrl = url.replace(/\/v\d+(\/.*)$/, "/v1$1");
+      return fetch(rewrittenUrl, init);
+    },
+  }).setToken(token);
+}
+
 // ─── REST client ─────────────────────────────────────────────────────────────
 
 class FluxerREST implements FluxerRESTClient {
@@ -192,7 +210,7 @@ export class FluxerClientImpl extends EventEmitter implements FluxerClient {
     this.gateway = new WebSocketManager({
       token,
       intents: intents ?? defaultIntents,
-      rest: new REST({ api: FLUXER_API, version: "1" }).setToken(token),
+      rest: createFluxerREST(token),
     });
 
     this._bindGatewayEvents();
