@@ -31,8 +31,8 @@ import type {
 
 export { GatewayDispatchEvents };
 
-const FLUXER_API = "https://api.fluxer.app/v1";
-// Note: Fluxer API version is part of the base URL
+const FLUXER_API = "https://api.fluxer.app";
+// Note: Fluxer API routes are at /v1, handled in each request path
 
 // ─── REST client ─────────────────────────────────────────────────────────────
 
@@ -44,19 +44,19 @@ class FluxerREST implements FluxerRESTClient {
   }
 
   async post(path: string, body?: unknown): Promise<unknown> {
-    return this.rest.post(path as `/${string}`, { body: body as Record<string, unknown> });
+    return this.rest.post(`/v1${path}` as `/${string}`, { body: body as Record<string, unknown> });
   }
 
   async get(path: string): Promise<unknown> {
-    return this.rest.get(path as `/${string}`);
+    return this.rest.get(`/v1${path}` as `/${string}`);
   }
 
   async patch(path: string, body?: unknown): Promise<unknown> {
-    return this.rest.patch(path as `/${string}`, { body: body as Record<string, unknown> });
+    return this.rest.patch(`/v1${path}` as `/${string}`, { body: body as Record<string, unknown> });
   }
 
   async delete(path: string): Promise<void> {
-    await this.rest.delete(path as `/${string}`);
+    await this.rest.delete(`/v1${path}` as `/${string}`);
   }
 
   async postWithFiles(path: string, body: unknown, files: { name: string; data: Buffer }[]): Promise<unknown> {
@@ -67,7 +67,7 @@ class FluxerREST implements FluxerRESTClient {
     }
     // Use raw fetch so we can send multipart
     const token = (this.rest as unknown as { token: string }).token;
-    const res = await fetch(`${FLUXER_API}${path}`, {
+    const res = await fetch(`${FLUXER_API}/v1${path}`, {
       method: "POST",
       headers: { Authorization: `Bot ${token}` },
       body: formData,

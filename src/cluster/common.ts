@@ -31,7 +31,7 @@ export async function getGatewayData() {
   const base =
     process.env.REST_PROXY && process.env.REST_PROXY !== "" ? process.env.REST_PROXY : "https://api.fluxer.app";
 
-  const request = await fetch(`${base}/gateway/bot`, {
+  const request = await fetch(`${base}/v1/gateway/bot`, {
     headers: {
       Authorization: `Bot ${process.env.TOKEN}`,
     },
