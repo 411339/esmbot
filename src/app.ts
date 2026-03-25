@@ -141,10 +141,20 @@ process.on("SIGTERM", async () => {
 });
 
 try {
+  // Add error handler to capture gateway errors
+  client.on("error", (error) => {
+    logger.error("Client error event:", error);
+  });
+
   await client.connect();
   logger.info("Connecting to Fluxer gateway...");
 } catch (e) {
   logger.error("esmBot failed to connect to Fluxer!");
-  logger.error(e);
+  if (e instanceof Error) {
+    logger.error(`Error message: ${e.message}`);
+    logger.error(`Error stack: ${e.stack}`);
+  } else {
+    logger.error(e);
+  }
   process.exit(1);
 }
