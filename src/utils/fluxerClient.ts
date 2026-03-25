@@ -192,7 +192,7 @@ export class FluxerClientImpl extends EventEmitter implements FluxerClient {
     this.gateway = new WebSocketManager({
       token,
       intents: intents ?? defaultIntents,
-      rest: new REST({ api: FLUXER_API, version: "11" }).setToken(token),
+      rest: new REST({ api: FLUXER_API, version: "1" }).setToken(token),
     });
 
     this._bindGatewayEvents();
