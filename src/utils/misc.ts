@@ -2,7 +2,6 @@ import { execFile as baseExecFile } from "node:child_process";
 import process from "node:process";
 import util, { promisify } from "node:util";
 import { config, type DotenvParseOutput } from "dotenv";
-import messagesConfig from "#config/messages.json" with { type: "json" };
 import commandsConfig from "#config/commands.json" with { type: "json" };
 import packageJson from "../../package.json" with { type: "json" };
 import type { DatabasePlugin } from "../database.ts";
@@ -96,18 +95,6 @@ export function textEncode(string: string): string {
 
 let broadcast = false;
 
-export async function activityChanger(client: FluxerClient) {
-  if (!broadcast) {
-    await client.editStatus("dnd", [
-      {
-        type: 0,
-        name: random(messagesConfig.messages),
-      },
-    ]);
-  }
-  setTimeout(() => activityChanger(client), 900000);
-}
-
 export async function checkBroadcast(client: FluxerClient, db: DatabasePlugin | undefined) {
   if (!db) return;
   const message = await db.getBroadcast();
@@ -120,7 +107,8 @@ export function startBroadcast(client: FluxerClient, message: string) {
 }
 
 export function endBroadcast(client: FluxerClient) {
-  client.editStatus("dnd", [{ type: 0, name: random(messagesConfig.messages) }]);
+  // Reset to default status
+  client.editStatus("online", []);
   broadcast = false;
 }
 

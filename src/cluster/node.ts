@@ -107,7 +107,7 @@ function updateStats(memOnly: boolean = false): Promise<void> {
   });
 }
 
-const broadcastTypes = ["broadcastEnd", "broadcastStart", "eval", "mediareload", "reload", "soundreload"];
+const broadcastTypes = ["broadcastEnd", "broadcastStart", "eval", "mediareload", "reload"];
 
 function awaitStart(i: number, shardArray: number[]): Promise<Worker> {
   const worker = cluster.fork({

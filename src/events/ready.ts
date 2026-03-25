@@ -1,7 +1,7 @@
 import process from "node:process";
 import { createPage, generateList } from "#utils/help.js";
 import logger from "#utils/logger.js";
-import { activityChanger, checkBroadcast } from "#utils/misc.js";
+import { checkBroadcast } from "#utils/misc.js";
 import type { EventParams, FluxerReadyData } from "#utils/types.js";
 
 let ready = false;
@@ -17,7 +17,6 @@ export default async ({ client, database }: EventParams, data: FluxerReadyData) 
   }
 
   await checkBroadcast(client, database);
-  activityChanger(client);
 
   ready = true;
 
