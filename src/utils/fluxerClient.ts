@@ -37,26 +37,50 @@ const FLUXER_API = "https://api.fluxer.app";
 // ─── REST client ─────────────────────────────────────────────────────────────
 
 class FluxerREST implements FluxerRESTClient {
-  private rest: REST;
+  private token: string;
 
   constructor(token: string) {
-    this.rest = new REST({ api: FLUXER_API }).setToken(token);
+    this.token = token;
+  }
+
+  private async request(method: string, path: string, body?: unknown): Promise<unknown> {
+    const url = `${FLUXER_API}/v1${path}`;
+    const options: RequestInit = {
+      method,
+      headers: {
+        Authorization: `Bot ${this.token}`,
+        "Content-Type": "application/json",
+      },
+    };
+
+    if (body) {
+      options.body = JSON.stringify(body);
+    }
+
+    const res = await fetch(url, options);
+    if (!res.ok) {
+      const error = (await res.json().catch(() => ({ message: res.statusText }))) as { message: string };
+      throw new Error(`HTTP ${res.status} on ${method} ${path}: ${error.message}`);
+    }
+
+    if (res.status === 204) return undefined; // No content
+    return res.json();
   }
 
   async post(path: string, body?: unknown): Promise<unknown> {
-    return this.rest.post(`/v1${path}` as `/${string}`, { body: body as Record<string, unknown> });
+    return this.request("POST", path, body);
   }
 
   async get(path: string): Promise<unknown> {
-    return this.rest.get(`/v1${path}` as `/${string}`);
+    return this.request("GET", path);
   }
 
   async patch(path: string, body?: unknown): Promise<unknown> {
-    return this.rest.patch(`/v1${path}` as `/${string}`, { body: body as Record<string, unknown> });
+    return this.request("PATCH", path, body);
   }
 
   async delete(path: string): Promise<void> {
-    await this.rest.delete(`/v1${path}` as `/${string}`);
+    await this.request("DELETE", path);
   }
 
   async postWithFiles(path: string, body: unknown, files: { name: string; data: Buffer }[]): Promise<unknown> {
@@ -66,10 +90,9 @@ class FluxerREST implements FluxerRESTClient {
       formData.set(`files[${i}]`, new Blob([file.data]), file.name);
     }
     // Use raw fetch so we can send multipart
-    const token = (this.rest as unknown as { token: string }).token;
     const res = await fetch(`${FLUXER_API}/v1${path}`, {
       method: "POST",
-      headers: { Authorization: `Bot ${token}` },
+      headers: { Authorization: `Bot ${this.token}` },
       body: formData,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status} on POST ${path}`);
@@ -169,7 +192,7 @@ export class FluxerClientImpl extends EventEmitter implements FluxerClient {
     this.gateway = new WebSocketManager({
       token,
       intents: intents ?? defaultIntents,
-      rest: new REST({ api: FLUXER_API }).setToken(token),
+      rest: new REST({ api: FLUXER_API, version: "11" }).setToken(token),
     });
 
     this._bindGatewayEvents();
