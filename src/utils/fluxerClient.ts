@@ -170,7 +170,6 @@ export class FluxerClientImpl extends EventEmitter implements FluxerClient {
       token,
       intents: intents ?? defaultIntents,
       rest: new REST({ api: FLUXER_API, version: API_VERSION }).setToken(token),
-      version: API_VERSION,
     });
 
     this._bindGatewayEvents();

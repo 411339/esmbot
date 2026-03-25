@@ -29,7 +29,7 @@ export type IncomingProcMessage = BaseProcMessage | ServerCountMessage;
 
 export async function getGatewayData() {
   const base =
-    process.env.REST_PROXY && process.env.REST_PROXY !== "" ? process.env.REST_PROXY : "https://discord.com/api/v10";
+    process.env.REST_PROXY && process.env.REST_PROXY !== "" ? process.env.REST_PROXY : "https://api.fluxer.app";
 
   const request = await fetch(`${base}/gateway/bot`, {
     headers: {
